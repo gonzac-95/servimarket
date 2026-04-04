@@ -1,0 +1,51 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 99%;
+    --foreground: 150 10% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 10% 8%;
+    --primary: 142 72% 29%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 142 72% 96%;
+    --secondary: 150 8% 96%;
+    --secondary-foreground: 150 10% 20%;
+    --muted: 150 8% 95%;
+    --muted-foreground: 150 5% 50%;
+    --accent: 142 72% 29%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 8% 90%;
+    --input: 150 8% 90%;
+    --ring: 142 72% 29%;
+    --radius: 0.75rem;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 10% 8%;
+    --success: 142 72% 29%;
+  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; font-family: "DM Sans", sans-serif; }
+  h1, h2, h3 { font-family: "DM Sans", sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+}
+
+.font-display { font-family: "DM Serif Display", serif; }
+.text-gradient { background: linear-gradient(135deg, #166534 0%, #16a34a 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.bg-gradient-hero { background: linear-gradient(135deg, #052e16 0%, #14532d 50%, #166534 100%); }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes slide-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-6px); } }
+.animate-slide-up { animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+.card-hover { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 12px 40px -8px rgba(22, 101, 52, 0.15); }
