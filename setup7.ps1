@@ -1,4 +1,5 @@
-﻿import { useState, useRef } from "react";
+Set-Content -Path "src\pages\Settings.tsx" -Encoding UTF8 -Value @'
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { supabase, uploadFile, getStorageUrl } from "../lib/supabase";
@@ -405,3 +406,6 @@ export default function Settings() {
     </div>
   );
 }
+'@
+
+Write-Host "✅ Settings rediseñado!" -ForegroundColor Green

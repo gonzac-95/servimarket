@@ -113,7 +113,21 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Actions */}
+        {/* Banner perfil incompleto para prestadores */}
+{!isClient && provider && (!provider.bio || provider.categories.length === 0) && (
+  <div onClick={() => navigate("/settings")} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors mb-2">
+    <div className="h-10 w-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+      <span className="text-xl">⚠️</span>
+    </div>
+    <div className="flex-1">
+      <p className="font-semibold text-sm text-amber-800">Completá tu perfil</p>
+      <p className="text-xs text-amber-600">Los clientes no pueden encontrarte hasta que completes tu información</p>
+    </div>
+    <ChevronRight className="h-4 w-4 text-amber-400 shrink-0" />
+  </div>
+)}
+
+{/* Actions */}
         <div className="flex gap-3 mb-6">
           {isClient && (
             <button onClick={() => navigate("/jobs/new")} className="flex-1 bg-green-600 text-white rounded-2xl py-3.5 font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-sm shadow-green-200">

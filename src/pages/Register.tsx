@@ -16,7 +16,7 @@ export default function Register() {
     const { error } = await signUp(form.email, form.password, form.name, form.role);
     setLoading(false);
     if (error) toast({ title: "Error al registrarse", description: error.message, variant: "destructive" });
-    else { toast({ title: "Â¡Cuenta creada!" }); navigate("/dashboard"); }
+    else { toast({ title: "¡Cuenta creada!" }); navigate(form.role === "provider" ? "/settings" : "/dashboard"); }
   }
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
