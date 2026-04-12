@@ -2,7 +2,9 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Provider } from "../types";
-import { Search as SearchIcon, Star, MapPin, ArrowLeft, Loader2, CheckCircle2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building, SlidersHorizontal, X } from "lucide-react";
+import { Search as SearchIcon, Star, MapPin, ArrowLeft, Loader2, CheckCircle2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building, SlidersHorizontal, X, Send } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../lib/auth";
 
 const CATEGORIES = [
   { name: "Gasista", icon: Wrench, color: "text-orange-500", bg: "bg-orange-50" },
@@ -18,7 +20,7 @@ const CATEGORIES = [
   { name: "Albañil", icon: Building, color: "text-stone-500", bg: "bg-stone-50" },
 ];
 
-function ProviderCard({ provider }: { provider: Provider }) {
+function ProviderCard({ provider, onRequest }: { provider: Provider; onRequest: (id: string, category: string) => void }) {
   const cat = CATEGORIES.find(c => provider.categories.includes(c.name));
   const Icon = cat?.icon ?? Wrench;
   return (
@@ -70,11 +72,20 @@ function ProviderCard({ provider }: { provider: Provider }) {
           </div>
         </div>
       </div>
+      <div className="px-5 pb-4 pt-0">
+        <button
+          onClick={e => { e.preventDefault(); onRequest(provider.id, provider.categories[0]); }}
+          className="w-full h-10 bg-green-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
+          <Send className="h-4 w-4" /> Solicitar servicio
+        </button>
+      </div>
     </Link>
   );
 }
 
 export default function Search() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,7 +196,7 @@ export default function Search() {
             <p className="text-sm text-gray-400 mt-1">Probá cambiando los filtros</p>
           </div>
         ) : (
-          <div className="space-y-3">{providers.map(p => <ProviderCard key={p.id} provider={p} />)}</div>
+          <div className="space-y-3">{providers.map(p => <ProviderCard key={p.id} provider={p} onRequest={(id, cat) => navigate(`/jobs/new?provider=${id}&category=${cat}`)} />)}</div>
         )}
       </div>
     </div>

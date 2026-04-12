@@ -1,9 +1,9 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { Job } from "../types";
-import { Plus, Search, LogOut, Settings, Bell, MapPin, Clock, ChevronRight, Star, Wrench, TrendingUp, Briefcase } from "lucide-react";
+import { Plus, Search, LogOut, Settings, Bell, MapPin, Clock, ChevronRight, Star, Wrench, TrendingUp, Briefcase, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -52,7 +52,38 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"active"|"history">("active");
+  const [unread, setUnread] = useState(0);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [notifs, setNotifs] = useState<any[]>([]);
   const isClient = user?.role === "client";
+
+  const loadNotifs = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setNotifs(data ?? []);
+    setUnread((data ?? []).filter((n: any) => !n.read).length);
+  }, [user]);
+
+  useEffect(() => {
+    loadNotifs();
+    const sub = supabase.channel(`notifs:${user?.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user?.id}` },
+        () => loadNotifs())
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [user, loadNotifs]);
+
+  async function markAllRead() {
+    if (!user) return;
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id);
+    setUnread(0);
+    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -81,8 +112,50 @@ export default function Dashboard() {
             <span className="font-bold text-lg">ServiMarket</span>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={() => navigate("/settings")} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><Settings className="h-5 w-5 text-gray-500" /></button>
-            <button onClick={async () => { await signOut(); navigate("/"); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><LogOut className="h-5 w-5 text-gray-500" /></button>
+            {/* Notificaciones */}
+            <div className="relative">
+              <button onClick={() => { setShowNotifs(!showNotifs); if (unread > 0) markAllRead(); }}
+                className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
+                <Bell className="h-5 w-5 text-gray-500" />
+                {unread > 0 && (
+                  <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </button>
+              {showNotifs && (
+                <div className="absolute right-0 top-12 w-80 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                    <span className="font-semibold text-sm">Notificaciones</span>
+                    <button onClick={() => setShowNotifs(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                      <X className="h-4 w-4 text-gray-400" />
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifs.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 text-sm">Sin notificaciones</div>
+                    ) : notifs.map((n: any) => (
+                      <div key={n.id} className={`px-4 py-3 border-b border-gray-50 last:border-0 ${!n.read ? "bg-green-50/50" : ""}`}>
+                        <div className="flex items-start gap-2">
+                          {!n.read && <span className="w-2 h-2 bg-green-500 rounded-full mt-1.5 shrink-0" />}
+                          <div className={!n.read ? "" : "ml-4"}>
+                            <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+                            <p className="text-xs text-gray-400 mt-1">{formatDistanceToNow(new Date(n.created_at), { locale: es, addSuffix: true })}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={() => navigate("/settings")} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <Settings className="h-5 w-5 text-gray-500" />
+            </button>
+            <button onClick={async () => { await signOut(); navigate("/"); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+              <LogOut className="h-5 w-5 text-gray-500" />
+            </button>
           </div>
         </div>
       </header>
@@ -114,20 +187,20 @@ export default function Dashboard() {
         )}
 
         {/* Banner perfil incompleto para prestadores */}
-{!isClient && provider && (!provider.bio || provider.categories.length === 0) && (
-  <div onClick={() => navigate("/settings")} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors mb-2">
-    <div className="h-10 w-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
-      <span className="text-xl">⚠️</span>
-    </div>
-    <div className="flex-1">
-      <p className="font-semibold text-sm text-amber-800">Completá tu perfil</p>
-      <p className="text-xs text-amber-600">Los clientes no pueden encontrarte hasta que completes tu información</p>
-    </div>
-    <ChevronRight className="h-4 w-4 text-amber-400 shrink-0" />
-  </div>
-)}
+        {!isClient && provider && (!provider.bio || provider.categories.length === 0) && (
+          <div onClick={() => navigate("/settings")} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors mb-4">
+            <div className="h-10 w-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <span className="text-xl">⚠️</span>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-amber-800">Completá tu perfil</p>
+              <p className="text-xs text-amber-600">Los clientes no pueden encontrarte hasta que completes tu información</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-amber-400 shrink-0" />
+          </div>
+        )}
 
-{/* Actions */}
+        {/* Actions */}
         <div className="flex gap-3 mb-6">
           {isClient && (
             <button onClick={() => navigate("/jobs/new")} className="flex-1 bg-green-600 text-white rounded-2xl py-3.5 font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-sm shadow-green-200">
@@ -155,7 +228,7 @@ export default function Dashboard() {
         ) : displayed.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Briefcase className="h-7 w-7 text-gray-300" /></div>
-            <p className="font-semibold text-gray-500">{activeTab === "active" ? "No tenés trabajos activos" : "Sin historial aíºn"}</p>
+            <p className="font-semibold text-gray-500">{activeTab === "active" ? "No tenés trabajos activos" : "Sin historial aún"}</p>
             {isClient && activeTab === "active" && (
               <button onClick={() => navigate("/jobs/new")} className="mt-4 bg-green-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:bg-green-700 transition-colors">
                 Crear primera solicitud
