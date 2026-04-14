@@ -2,7 +2,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
-import { ArrowLeft, Star, MapPin, CheckCircle2, Loader2, MessageSquare, DollarSign, Clock } from "lucide-react";
+import { ArrowLeft, Star, MapPin, CheckCircle2, Loader2, MessageSquare, DollarSign, Clock, Heart } from "lucide-react";
+import { useFavorites } from "../hooks/useFavorites";
 
 export default function ProviderProfile() {
   const { id } = useParams();
@@ -11,6 +12,7 @@ export default function ProviderProfile() {
   const [provider, setProvider] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   useEffect(() => {
     async function load() {
@@ -56,9 +58,17 @@ export default function ProviderProfile() {
               <div className="h-20 w-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center text-2xl font-bold text-green-700">
                 {u?.avatar_url ? <img src={u.avatar_url} alt="" className="h-full w-full rounded-xl object-cover" /> : initials}
               </div>
-              {provider.is_available
-                ? <span className="bg-green-50 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-xl border border-green-100 flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full" />Disponible</span>
-                : <span className="bg-gray-50 text-gray-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-100">No disponible</span>}
+              <div className="flex items-center gap-2">
+                {provider.is_available
+                  ? <span className="bg-green-50 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-xl border border-green-100 flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full" />Disponible</span>
+                  : <span className="bg-gray-50 text-gray-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-100">No disponible</span>}
+                {user && user.role === "client" && (
+                  <button onClick={() => toggleFavorite(provider.id)}
+                    className={`p-2 rounded-xl border transition-all ${isFavorite(provider.id) ? "bg-red-50 border-red-200 text-red-500" : "bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400"}`}>
+                    <Heart className={`h-4 w-4 ${isFavorite(provider.id) ? "fill-red-500" : ""}`} />
+                  </button>
+                )}
+              </div>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">{u?.name}</h1>
             <div className="flex flex-wrap gap-1.5 mb-3">

@@ -104,7 +104,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
@@ -112,7 +111,6 @@ export default function Dashboard() {
             <span className="font-bold text-lg">ServiMarket</span>
           </div>
           <div className="flex items-center gap-1">
-            {/* Notificaciones */}
             <div className="relative">
               <button onClick={() => { setShowNotifs(!showNotifs); if (unread > 0) markAllRead(); }}
                 className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
@@ -161,13 +159,11 @@ export default function Dashboard() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Welcome */}
         <div className="mb-6">
           <p className="text-sm text-gray-400 mb-0.5">Bienvenido de nuevo</p>
           <h1 className="text-2xl font-bold text-gray-900">{user?.name} 👋</h1>
         </div>
 
-        {/* Stats for providers */}
         {!isClient && provider && (
           <div className="grid grid-cols-3 gap-3 mb-6">
             {[
@@ -186,7 +182,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Banner perfil incompleto para prestadores */}
         {!isClient && provider && (!provider.bio || provider.categories.length === 0) && (
           <div onClick={() => navigate("/settings")} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors mb-4">
             <div className="h-10 w-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
@@ -200,7 +195,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex gap-3 mb-6">
           {isClient && (
             <button onClick={() => navigate("/jobs/new")} className="flex-1 bg-green-600 text-white rounded-2xl py-3.5 font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-sm shadow-green-200">
@@ -210,9 +204,13 @@ export default function Dashboard() {
           <button onClick={() => navigate("/search")} className={`${isClient ? "flex-1" : "w-full"} bg-white border border-gray-200 text-gray-700 rounded-2xl py-3.5 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors`}>
             <Search className="h-5 w-5" /> Buscar prestadores
           </button>
+          {isClient && (
+            <button onClick={() => navigate("/favorites")} className="bg-white border border-gray-200 text-gray-700 rounded-2xl py-3.5 px-4 flex items-center justify-center hover:bg-gray-50 transition-colors" title="Mis favoritos">
+              <Star className="h-5 w-5 text-amber-400" />
+            </button>
+          )}
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 mb-5">
           {(["active","history"] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
@@ -222,7 +220,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Jobs */}
         {loading ? (
           <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-28 bg-gray-100 animate-pulse rounded-2xl" />)}</div>
         ) : displayed.length === 0 ? (

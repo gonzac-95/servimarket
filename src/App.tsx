@@ -12,6 +12,7 @@ import JobCreate from './pages/JobCreate';
 import JobDetail from './pages/JobDetail';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import Favorites from './pages/Favorites';
 import Admin from './pages/Admin';
 import NotFound from './pages/NotFound';
 
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/jobs/new" element={<ProtectedRoute><JobCreate /></ProtectedRoute>} />
           <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+<Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin/*" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
