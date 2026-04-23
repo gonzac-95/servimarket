@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { Job, Message } from "../types";
 import { useToast } from "../components/ui/use-toast";
-import { ArrowLeft, Send, Loader2, Star, CheckCircle2, XCircle, Play, MapPin, Calendar, Clock, DollarSign } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Star, CheckCircle2, XCircle, Play, MapPin, Calendar, Clock, DollarSign, Tag } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -70,6 +70,10 @@ export default function JobDetail() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [hasReview, setHasReview] = useState(false);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({ amount: "", description: "" });
+  const [sendingQuote, setSendingQuote] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadJob = useCallback(async () => {
@@ -86,9 +90,16 @@ export default function JobDetail() {
     setMessages(data ?? []);
   }, [id]);
 
+  const loadQuotes = useCallback(async () => {
+    const { data } = await supabase.from("quotes").select("*, providers(*, users(*))")
+      .eq("job_id", id).order("created_at", { ascending: false });
+    setQuotes(data ?? []);
+  }, [id]);
+
   useEffect(() => {
     loadJob();
     loadMessages();
+    loadQuotes();
     const sub = supabase.channel(`job:${id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `job_id=eq.${id}` },
         (payload) => setMessages(prev => [...prev, payload.new as Message]))
@@ -166,13 +177,54 @@ export default function JobDetail() {
 
         {/* Action buttons */}
         {isProvider && job.status === "pending" && (
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => updateStatus("accepted")} className="h-12 bg-green-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
-              <CheckCircle2 className="h-5 w-5" /> Aceptar
-            </button>
-            <button onClick={() => updateStatus("cancelled")} className="h-12 bg-white border border-red-200 text-red-500 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
-              <XCircle className="h-5 w-5" /> Rechazar
-            </button>
+          <div className="space-y-3">
+            {/* Formulario de cotización */}
+            {!showQuoteForm ? (
+              <button onClick={() => setShowQuoteForm(true)}
+                className="w-full h-12 bg-white border-2 border-green-600 text-green-600 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-50 transition-colors">
+                <Tag className="h-5 w-5" /> Enviar cotización
+              </button>
+            ) : (
+              <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
+                <h3 className="font-semibold text-sm text-gray-900">Enviar cotización al cliente</h3>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                  <input type="number" placeholder="Monto" value={quoteForm.amount}
+                    onChange={e => setQuoteForm(f => ({...f, amount: e.target.value}))}
+                    className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <textarea value={quoteForm.description} onChange={e => setQuoteForm(f => ({...f, description: e.target.value}))}
+                  placeholder="Descripción del trabajo a realizar (opcional)..."
+                  className="w-full min-h-[70px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <div className="flex gap-2">
+                  <button onClick={() => setShowQuoteForm(false)} className="flex-1 h-10 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+                    Cancelar
+                  </button>
+                  <button disabled={!quoteForm.amount || sendingQuote} onClick={async () => {
+                    if (!job.provider_id) return;
+                    setSendingQuote(true);
+                    await supabase.from("quotes").insert({
+                      job_id: id, provider_id: job.provider_id,
+                      amount: parseFloat(quoteForm.amount), description: quoteForm.description
+                    });
+                    await loadQuotes();
+                    setQuoteForm({ amount: "", description: "" });
+                    setShowQuoteForm(false);
+                    setSendingQuote(false);
+                  }} className="flex-1 h-10 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1">
+                    {sendingQuote && <Loader2 className="h-4 w-4 animate-spin" />} Enviar
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => updateStatus("accepted")} className="h-12 bg-green-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
+                <CheckCircle2 className="h-5 w-5" /> Aceptar
+              </button>
+              <button onClick={() => updateStatus("cancelled")} className="h-12 bg-white border border-red-200 text-red-500 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
+                <XCircle className="h-5 w-5" /> Rechazar
+              </button>
+            </div>
           </div>
         )}
         {isProvider && job.status === "accepted" && (
@@ -194,6 +246,55 @@ export default function JobDetail() {
         {/* Review */}
         {isClient && job.status === "completed" && !hasReview && job.provider_id && (
           <ReviewModal jobId={job.id} providerId={job.provider_id} onDone={() => setHasReview(true)} />
+        )}
+
+        {/* Cotizaciones */}
+        {quotes.length > 0 && (
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h3 className="font-semibold text-sm text-gray-900 mb-3 flex items-center gap-2">
+              <Tag className="h-4 w-4 text-green-600" /> Cotizaciones
+            </h3>
+            <div className="space-y-3">
+              {quotes.map((q: any) => (
+                <div key={q.id} className={`p-4 rounded-xl border ${
+                  q.status === "accepted" ? "bg-green-50 border-green-200" :
+                  q.status === "rejected" ? "bg-gray-50 border-gray-200" :
+                  "bg-amber-50 border-amber-200"
+                }`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span className="text-lg font-bold text-green-700">${parseFloat(q.amount).toLocaleString()}</span>
+                      <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-lg ${
+                        q.status === "accepted" ? "bg-green-100 text-green-700" :
+                        q.status === "rejected" ? "bg-gray-100 text-gray-500" :
+                        "bg-amber-100 text-amber-700"
+                      }`}>
+                        {q.status === "accepted" ? "Aceptada" : q.status === "rejected" ? "Rechazada" : "Pendiente"}
+                      </span>
+                    </div>
+                  </div>
+                  {q.description && <p className="text-sm text-gray-600 mb-3">{q.description}</p>}
+                  {isClient && q.status === "pending" && (
+                    <div className="flex gap-2">
+                      <button onClick={async () => {
+                        await supabase.from("quotes").update({ status: "accepted" }).eq("id", q.id);
+                        await supabase.from("jobs").update({ price: q.amount, status: "accepted" }).eq("id", id);
+                        loadQuotes(); loadJob();
+                      }} className="flex-1 h-9 bg-green-600 text-white rounded-xl text-xs font-semibold hover:bg-green-700 transition-colors">
+                        Aceptar cotización
+                      </button>
+                      <button onClick={async () => {
+                        await supabase.from("quotes").update({ status: "rejected" }).eq("id", q.id);
+                        loadQuotes();
+                      }} className="flex-1 h-9 border border-red-200 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 transition-colors">
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Chat */}
