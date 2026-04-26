@@ -5,7 +5,7 @@ import { supabase, uploadFile, getStorageUrl } from "../lib/supabase";
 import { useToast } from "../components/ui/use-toast";
 import {
   ArrowLeft, Loader2, Save, Camera, Plus, Trash2, ChevronDown, ChevronUp,
-  Wrench, Star, MapPin, Phone, User, FileText, DollarSign, Image, CheckCircle2, X
+  Wrench, Star, MapPin, Phone, User, FileText, DollarSign, Image, CheckCircle2, X, Pencil
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -26,6 +26,9 @@ export default function Settings() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? "");
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [openSection, setOpenSection] = useState<Section>("personal");
@@ -94,6 +97,24 @@ export default function Settings() {
     setUploadingPhoto(false);
   }
 
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    const path = `${user.id}/avatar.${file.name.split(".").pop()}`;
+    const uploaded = await uploadFile("avatars", path, file);
+    if (uploaded) {
+      const url = getStorageUrl("avatars", uploaded);
+      setAvatarUrl(url);
+      await supabase.from("users").update({ avatar_url: url }).eq("id", user.id);
+      await refreshUser();
+      toast({ title: "Foto de perfil actualizada" });
+    } else {
+      toast({ title: "Error al subir la foto", variant: "destructive" });
+    }
+    setUploadingAvatar(false);
+  }
+
   function removePhoto(url: string) {
     setForm(f => ({ ...f, photos: f.photos.filter(p => p !== url) }));
   }
@@ -157,6 +178,28 @@ export default function Settings() {
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-3">
+
+        {/* Avatar */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="relative">
+            <div className="h-24 w-24 rounded-2xl bg-green-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+              {uploadingAvatar ? (
+                <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+              ) : avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-3xl font-bold text-green-700">{user?.name?.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <button onClick={() => avatarInputRef.current?.click()}
+              className="absolute -bottom-2 -right-2 h-8 w-8 bg-green-600 text-white rounded-xl flex items-center justify-center shadow-md hover:bg-green-700 transition-colors">
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+          </div>
+          <p className="text-sm font-semibold text-gray-900 mt-3">{user?.name}</p>
+          <p className="text-xs text-gray-400">{user?.email}</p>
+        </div>
 
         {/* Completeness indicator for providers */}
         {provider && (
