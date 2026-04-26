@@ -60,14 +60,7 @@ export default function Settings() {
     }));
   }
 
-  function toggleZone(zone: string) {
-    setForm(f => ({
-      ...f,
-      service_zones: f.service_zones.includes(zone)
-        ? f.service_zones.filter(z => z !== zone)
-        : [...f.service_zones, zone]
-    }));
-  }
+  
 
   function addPriceItem() {
     setForm(f => ({ ...f, price_list: [...f.price_list, { service: "", price: "", unit: "trabajo" }] }));
@@ -295,21 +288,7 @@ export default function Settings() {
                     </div>
                   </div>
 
-                  {/* Zones */}
-                  <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">Zonas donde trabajo</label>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {ZONES.map(zone => (
-                        <button key={zone} type="button" onClick={() => toggleZone(zone)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all border ${
-                            form.service_zones.includes(zone)
-                              ? "bg-green-600 text-white border-green-600"
-                              : "bg-gray-50 text-gray-600 border-gray-100 hover:border-green-300"
-                          }`}>
-                          {zone}
-                        </button>
-                      ))}
-                    </div>
+                  
                     <div>
                       <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Radio de servicio (km)</label>
                       <div className="flex items-center gap-3">
@@ -319,8 +298,6 @@ export default function Settings() {
                         <span className="text-sm font-bold text-green-700 w-16 text-right">{form.service_radius_km} km</span>
                       </div>
                     </div>
-                  </div>
-
                   {/* CUIT */}
                   <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">CUIT/CUIL (opcional)</label>
