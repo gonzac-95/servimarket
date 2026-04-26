@@ -12,6 +12,7 @@ export default function ProviderProfile() {
   const [provider, setProvider] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const { isFavorite, toggleFavorite } = useFavorites();
 
   useEffect(() => {
@@ -108,6 +109,70 @@ export default function ProviderProfile() {
           <div className="bg-white border border-gray-100 rounded-2xl p-5">
             <h2 className="font-semibold text-gray-900 mb-2">Sobre mí</h2>
             <p className="text-gray-500 text-sm leading-relaxed">{provider.bio}</p>
+          </div>
+        )}
+
+        {/* Galería de fotos */}
+        {provider.photos?.length > 0 && (
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <span>📷</span> Trabajos realizados
+              <span className="text-xs font-normal text-gray-400 ml-1">({provider.photos.length} fotos)</span>
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {provider.photos.map((photo: string, i: number) => (
+                <div key={i} className="aspect-square rounded-xl overflow-hidden bg-gray-100 cursor-pointer group relative"
+                  onClick={() => setSelectedPhoto(photo)}>
+                  <img src={photo} alt={`Trabajo ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Lightbox */}
+        {selectedPhoto && (
+          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
+            <div className="relative max-w-2xl w-full">
+              <img src={selectedPhoto} alt="Foto ampliada" className="w-full rounded-2xl object-contain max-h-[80vh]" />
+              <button onClick={() => setSelectedPhoto(null)}
+                className="absolute -top-4 -right-4 h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors">
+                <span className="text-gray-900 font-bold text-lg">✕</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Galería de fotos */}
+        {provider.photos?.length > 0 && (
+          <div className="bg-white border border-gray-100 rounded-2xl p-5">
+            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <span>📷</span> Trabajos realizados
+              <span className="text-xs font-normal text-gray-400 ml-1">({provider.photos.length} fotos)</span>
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {provider.photos.map((photo: string, i: number) => (
+                <div key={i} className="aspect-square rounded-xl overflow-hidden bg-gray-100 cursor-pointer group relative"
+                  onClick={() => setSelectedPhoto(photo)}>
+                  <img src={photo} alt={`Trabajo ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Lightbox */}
+        {selectedPhoto && (
+          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
+            <div className="relative max-w-2xl w-full">
+              <img src={selectedPhoto} alt="Foto ampliada" className="w-full rounded-2xl object-contain max-h-[80vh]" />
+              <button onClick={() => setSelectedPhoto(null)}
+                className="absolute -top-4 -right-4 h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:bg-gray-100 transition-colors">
+                <span className="text-gray-900 font-bold text-lg">✕</span>
+              </button>
+            </div>
           </div>
         )}
 
