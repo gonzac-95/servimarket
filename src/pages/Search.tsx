@@ -91,6 +91,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [filters, setFilters] = useState({
     category: searchParams.get("category") ?? "",
     minRating: "0",
@@ -103,13 +104,14 @@ export default function Search() {
     let q = supabase.from("providers").select("*, users(*)", { count: "exact" })
       .eq("is_available", true).order("rating_avg", { ascending: false }).limit(30);
     if (filters.category) q = q.contains("categories", [filters.category]);
+    if (query) q = q.ilike("bio", `%${query}%`);
     if (parseFloat(filters.minRating) > 0) q = q.gte("rating_avg", parseFloat(filters.minRating));
     if (filters.onlyVerified) q = q.eq("documents_verified", true);
     const { data, count } = await q;
     setProviders((data as Provider[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
-  }, [filters]);
+  }, [filters, query]);
 
   useEffect(() => { search(); }, [search]);
 
@@ -128,6 +130,8 @@ export default function Search() {
             <input
               className="w-full h-10 bg-gray-100 rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all"
               placeholder="Buscar servicio..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
             />
           </div>
           <button onClick={() => setShowFilters(!showFilters)}

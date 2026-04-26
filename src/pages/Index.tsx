@@ -1,6 +1,6 @@
 ﻿import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { Search, Shield, Star, Zap, MapPin, MessageSquare, CreditCard, ArrowRight, CheckCircle2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building, ChevronDown } from "lucide-react";
+import { Search, Shield, Star, Zap, MapPin, MessageSquare, CreditCard, ArrowRight, CheckCircle2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building, ChevronDown, Heart, Utensils, Car, Monitor, Camera, Smartphone } from "lucide-react";
 
 const categories = [
   { name: "Gasista", icon: Wrench, color: "text-orange-500", bg: "bg-orange-50", border: "border-orange-100" },
@@ -14,6 +14,20 @@ const categories = [
   { name: "Limpieza", icon: Sparkles, color: "text-cyan-500", bg: "bg-cyan-50", border: "border-cyan-100" },
   { name: "Técnico Aire", icon: Wind, color: "text-sky-500", bg: "bg-sky-50", border: "border-sky-100" },
   { name: "Albañil", icon: Building, color: "text-stone-500", bg: "bg-stone-50", border: "border-stone-100" },
+  { name: "Mudanzas", icon: Truck, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
+  { name: "Fumigador", icon: Wind, color: "text-lime-600", bg: "bg-lime-50", border: "border-lime-100" },
+  { name: "Soldador", icon: Hammer, color: "text-red-500", bg: "bg-red-50", border: "border-red-100" },
+  { name: "Herrería", icon: Wrench, color: "text-zinc-600", bg: "bg-zinc-50", border: "border-zinc-100" },
+  { name: "Electrodomésticos", icon: Zap, color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-100" },
+  { name: "Niñera", icon: Heart, color: "text-pink-500", bg: "bg-pink-50", border: "border-pink-100" },
+  { name: "Cuidador", icon: Heart, color: "text-rose-500", bg: "bg-rose-50", border: "border-rose-100" },
+  { name: "Cocinero", icon: Utensils, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100" },
+  { name: "Chofer", icon: Car, color: "text-indigo-500", bg: "bg-indigo-50", border: "border-indigo-100" },
+  { name: "Técnico PC", icon: Monitor, color: "text-blue-500", bg: "bg-blue-50", border: "border-blue-100" },
+  { name: "Cámaras", icon: Camera, color: "text-gray-600", bg: "bg-gray-50", border: "border-gray-100" },
+  { name: "Técnico TV", icon: Monitor, color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-100" },
+  { name: "Cel y tablets", icon: Smartphone, color: "text-teal-500", bg: "bg-teal-50", border: "border-teal-100" },
+  { name: "Arquitecto", icon: Building, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-100" },
 ];
 
 const features = [
@@ -132,16 +146,28 @@ export default function Index() {
             <h2 className="text-4xl font-bold text-gray-900 mt-2 mb-3">¿Qué servicio necesitás?</h2>
             <p className="text-gray-500 max-w-xl mx-auto">Encontrá el profesional ideal para cada tarea del hogar o negocio</p>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-11 gap-3">
-            {categories.map(({ name, icon: Icon, color, bg, border }) => (
-              <Link key={name} to={`/search?category=${name}`}
-                className={`${bg} border ${border} rounded-2xl p-3 flex flex-col items-center gap-2 hover:-translate-y-1 hover:shadow-md transition-all duration-200 cursor-pointer`}>
-                <div className="h-11 w-11 bg-white rounded-xl shadow-sm flex items-center justify-center">
-                  <Icon className={`h-5 w-5 ${color}`} />
-                </div>
-                <span className="text-xs font-medium text-center text-gray-700 leading-tight">{name}</span>
-              </Link>
-            ))}
+          <div className="relative">
+            <button
+              onClick={() => document.getElementById('cat-scroll')!.scrollBy({left: -300, behavior: 'smooth'})}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 h-10 w-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors">
+              <ArrowRight className="h-4 w-4 text-gray-600 rotate-180" />
+            </button>
+            <div id="cat-scroll" className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+              {categories.map(({ name, icon: Icon, color, bg, border }) => (
+                <Link key={name} to={`/search?category=${name}`}
+                  className={`${bg} border ${border} rounded-2xl p-3 flex flex-col items-center gap-2 hover:-translate-y-1 hover:shadow-md transition-all duration-200 cursor-pointer shrink-0 w-24`}>
+                  <div className="h-11 w-11 bg-white rounded-xl shadow-sm flex items-center justify-center">
+                    <Icon className={`h-5 w-5 ${color}`} />
+                  </div>
+                  <span className="text-xs font-medium text-center text-gray-700 leading-tight">{name}</span>
+                </Link>
+              ))}
+            </div>
+            <button
+              onClick={() => document.getElementById('cat-scroll')!.scrollBy({left: 300, behavior: 'smooth'})}
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 h-10 w-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors">
+              <ArrowRight className="h-4 w-4 text-gray-600" />
+            </button>
           </div>
         </div>
       </section>

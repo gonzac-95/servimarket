@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../components/ui/use-toast";
-import { CheckCircle2, ArrowRight, ArrowLeft, Loader2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building } from "lucide-react";
+import { CheckCircle2, ArrowRight, ArrowLeft, Loader2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building, Zap, Heart, Utensils, Car, Monitor, Camera, Smartphone } from "lucide-react";
 
 const CATEGORIES = [
   { name: "Gasista", icon: Wrench, color: "text-orange-500", bg: "bg-orange-50 border-orange-200" },
@@ -17,6 +17,20 @@ const CATEGORIES = [
   { name: "Limpieza", icon: Sparkles, color: "text-cyan-500", bg: "bg-cyan-50 border-cyan-200" },
   { name: "Técnico Aire", icon: Wind, color: "text-sky-500", bg: "bg-sky-50 border-sky-200" },
   { name: "Albañil", icon: Building, color: "text-stone-500", bg: "bg-stone-50 border-stone-200" },
+  { name: "Mudanzas", icon: Truck, color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+  { name: "Fumigador", icon: Wind, color: "text-lime-600", bg: "bg-lime-50 border-lime-200" },
+  { name: "Soldador", icon: Hammer, color: "text-red-500", bg: "bg-red-50 border-red-200" },
+  { name: "Herrería", icon: Wrench, color: "text-zinc-600", bg: "bg-zinc-50 border-zinc-200" },
+  { name: "Electrodomésticos", icon: Zap, color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200" },
+  { name: "Niñera", icon: Heart, color: "text-pink-500", bg: "bg-pink-50 border-pink-200" },
+  { name: "Cuidador", icon: Heart, color: "text-rose-500", bg: "bg-rose-50 border-rose-200" },
+  { name: "Cocinero", icon: Utensils, color: "text-orange-600", bg: "bg-orange-50 border-orange-200" },
+  { name: "Chofer", icon: Car, color: "text-indigo-500", bg: "bg-indigo-50 border-indigo-200" },
+  { name: "Técnico PC", icon: Monitor, color: "text-blue-500", bg: "bg-blue-50 border-blue-200" },
+  { name: "Cámaras", icon: Camera, color: "text-gray-600", bg: "bg-gray-50 border-gray-200" },
+  { name: "Técnico TV", icon: Monitor, color: "text-purple-600", bg: "bg-purple-50 border-purple-200" },
+  { name: "Cel y tablets", icon: Smartphone, color: "text-teal-500", bg: "bg-teal-50 border-teal-200" },
+  { name: "Arquitecto", icon: Building, color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
 ];
 
 const STEPS = [
