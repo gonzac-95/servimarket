@@ -13,6 +13,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,14 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadUserProfile(supaUser: SupabaseUser) {
     try {
-      const { data } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', supaUser.id)
-        .single();
+      // El perfil propio completo (email/teléfono incluidos) sale de una RPC:
+      // la lectura directa de users sólo expone columnas públicas.
+      const { data } = await supabase.rpc('get_my_profile').single();
       if (data) {
-        setUser(data);
-        if (data.role === 'provider') {
+        setUser(data as User);
+        if ((data as User).role === 'provider') {
           const { data: provData } = await supabase
             .from('providers')
             .select('*')
@@ -99,10 +99,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }
 
+  // Envía el email con el link para restablecer la contraseña.
+  async function resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return { error: error as Error | null };
+  }
+
+  // Actualiza la contraseña del usuario (requiere sesión activa,
+  // que Supabase crea automáticamente al volver desde el link del email).
+  async function updatePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error: error as Error | null };
+  }
+
   return (
     <AuthContext.Provider value={{
       supabaseUser, user, provider, session, loading,
-      signUp, signIn, signOut, refreshUser,
+      signUp, signIn, signOut, refreshUser, resetPassword, updatePassword,
     }}>
       {children}
     </AuthContext.Provider>

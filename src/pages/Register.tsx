@@ -1,55 +1,81 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { useToast } from "../components/ui/use-toast";
-import { Loader2, User, Wrench } from "lucide-react";
+import { useTheme } from "../lib/theme";
+import { Button, Field, toast } from "../components/mobile/kit";
+import { Icon } from "../components/mobile/Icon";
+
 export default function Register() {
+  const t = useTheme();
   const { signUp } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const [role, setRole] = useState<"client" | "provider">("client");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [accept, setAccept] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "client" as "client"|"provider" });
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (form.password.length < 8) { toast({ title: "Contraseña muy corta", description: "Mí­nimo 8 caracteres.", variant: "destructive" }); return; }
+
+  async function handleSubmit() {
+    if (loading) return;
+    if (pass.length < 8) { toast("La contraseña debe tener 8+ caracteres", "close"); return; }
+    if (!accept) { toast("Aceptá los términos para continuar", "close"); return; }
     setLoading(true);
-    const { error } = await signUp(form.email, form.password, form.name, form.role);
+    const { error } = await signUp(email.trim(), pass, name.trim(), role);
     setLoading(false);
-    if (error) toast({ title: "Error al registrarse", description: error.message, variant: "destructive" });
-    else { toast({ title: "¡Cuenta creada!" }); navigate(form.role === "provider" ? "/settings" : "/dashboard"); }
+    if (error) { toast("No se pudo crear la cuenta", "close"); return; }
+    toast("¡Cuenta creada!");
+    navigate(role === "provider" ? "/settings" : "/dashboard", { replace: true });
   }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl border shadow-sm p-8">
-        <div className="text-center mb-6">
-          <Link to="/" className="font-bold text-2xl text-gradient">ServiMarket</Link>
-          <p className="text-gray-500 mt-1 text-sm">Elegí­ tu rol y completá tus datos</p>
+    <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ padding: "54px 20px 0" }}>
+        <button onClick={() => navigate("/login")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name="arrow-left" size={20} color={t.ink} />
+        </button>
+      </div>
+      <div style={{ padding: "24px 24px 0" }}>
+        <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 34, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em", lineHeight: 1.05 }}>Creá tu cuenta</h1>
+        <p style={{ marginTop: 8, fontFamily: t.fontBody, fontSize: 14, color: t.inkMute }}>Empezá en menos de un minuto.</p>
+      </div>
+      <div style={{ padding: "20px 24px 0" }}>
+        <div style={{ display: "flex", background: t.surfaceAlt, borderRadius: t.radiusSm, padding: 4, gap: 4 }}>
+          {[
+            { id: "client" as const, label: "Soy cliente", sub: "Busco un servicio" },
+            { id: "provider" as const, label: "Soy prestador", sub: "Ofrezco servicios" },
+          ].map(opt => {
+            const on = role === opt.id;
+            return (
+              <button key={opt.id} onClick={() => setRole(opt.id)} style={{
+                all: "unset", cursor: "pointer", flex: 1, padding: "12px 10px",
+                background: on ? t.surface : "transparent", borderRadius: t.radiusSm - 2,
+                boxShadow: on ? "0 1px 3px rgba(0,0,0,0.06)" : "none", textAlign: "center", transition: "all .15s",
+              }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: on ? t.ink : t.inkMute }}>{opt.label}</div>
+                <div style={{ fontFamily: t.fontBody, fontSize: 11.5, color: on ? t.inkMute : t.inkSoft, marginTop: 2 }}>{opt.sub}</div>
+              </button>
+            );
+          })}
         </div>
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {([{value:"client",label:"Soy Cliente",sub:"Busco servicios",Icon:User},{value:"provider",label:"Soy Prestador",sub:"Ofrezco servicios",Icon:Wrench}] as const).map(({value,label,sub,Icon}) => (
-            <button key={value} type="button" onClick={() => setForm(f => ({...f, role: value}))}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${form.role===value?"border-indigo-600 bg-indigo-50":"border-gray-200 hover:border-indigo-300"}`}>
-              <Icon className={`h-6 w-6 mb-2 ${form.role===value?"text-indigo-600":"text-gray-400"}`} />
-              <div className="font-semibold text-sm">{label}</div>
-              <div className="text-xs text-gray-400">{sub}</div>
-            </button>
-          ))}
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div><label className="text-sm font-medium block mb-1">Nombre completo</label>
-            <input placeholder="Juan Pérez" value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} required
-              className="w-full h-10 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-          <div><label className="text-sm font-medium block mb-1">Email</label>
-            <input type="email" placeholder="tu@email.com" value={form.email} onChange={e => setForm(f=>({...f,email:e.target.value}))} required
-              className="w-full h-10 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-          <div><label className="text-sm font-medium block mb-1">Contraseña</label>
-            <input type="password" placeholder="Mí­nimo 8 caracteres" value={form.password} onChange={e => setForm(f=>({...f,password:e.target.value}))} required minLength={8}
-              className="w-full h-10 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-          <button type="submit" disabled={loading} className="w-full h-10 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />} Crear cuenta gratis
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-gray-500">¿Ya tenés cuenta? <Link to="/login" className="text-indigo-600 font-medium hover:underline">Iniciá sesión</Link></p>
+      </div>
+      <div style={{ padding: "20px 24px 0", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+        <Field label="Nombre completo" value={name} onChange={setName} placeholder="Cómo te llamás" />
+        <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="vos@ejemplo.com" />
+        <Field label="Contraseña" value={pass} onChange={setPass} type="password" placeholder="8+ caracteres" />
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4, cursor: "pointer" }}>
+          <div onClick={() => setAccept(!accept)} style={{
+            width: 22, height: 22, borderRadius: 6, marginTop: 1,
+            background: accept ? t.green : t.surface, border: `1.5px solid ${accept ? t.green : t.line}`,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{accept && <Icon name="check" size={14} color="#fff" stroke={2.5} />}</div>
+          <span style={{ fontFamily: t.fontBody, fontSize: 13, color: t.inkMute, lineHeight: 1.4 }}>
+            Acepto los <strong onClick={() => navigate("/terminos")} style={{ color: t.ink, textDecoration: "underline" }}>Términos</strong> y la <strong onClick={() => navigate("/privacidad")} style={{ color: t.ink, textDecoration: "underline" }}>Política de privacidad</strong>.
+          </span>
+        </label>
+      </div>
+      <div style={{ padding: "0 24px 30px" }}>
+        <Button variant="green" size="lg" full onClick={handleSubmit} disabled={!accept || loading}>{loading ? "Creando..." : "Crear cuenta"}</Button>
       </div>
     </div>
   );

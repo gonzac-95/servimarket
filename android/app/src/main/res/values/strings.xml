@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ServiMarket</string>
+    <string name="title_activity_main">ServiMarket</string>
+    <string name="package_name">com.servimarket.app</string>
+    <string name="custom_url_scheme">com.servimarket.app</string>
+</resources>

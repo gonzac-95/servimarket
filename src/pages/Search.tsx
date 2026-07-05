@@ -1,204 +1,146 @@
-﻿import { useState, useEffect, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { Provider } from "../types";
-import { Search as SearchIcon, Star, MapPin, ArrowLeft, Loader2, CheckCircle2, Wrench, Plug, Truck, Paintbrush, Key, Hammer, Leaf, Sparkles, Wind, Building, SlidersHorizontal, X, Send } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-
-const CATEGORIES = [
-  { name: "Gasista", icon: Wrench, color: "text-orange-500", bg: "bg-orange-50" },
-  { name: "Electricista", icon: Plug, color: "text-yellow-500", bg: "bg-yellow-50" },
-  { name: "Plomero", icon: Wrench, color: "text-blue-500", bg: "bg-blue-50" },
-  { name: "Flete", icon: Truck, color: "text-green-500", bg: "bg-green-50" },
-  { name: "Pintor", icon: Paintbrush, color: "text-purple-500", bg: "bg-purple-50" },
-  { name: "Cerrajero", icon: Key, color: "text-gray-500", bg: "bg-gray-50" },
-  { name: "Carpintero", icon: Hammer, color: "text-amber-600", bg: "bg-amber-50" },
-  { name: "Jardinero", icon: Leaf, color: "text-emerald-500", bg: "bg-emerald-50" },
-  { name: "Limpieza", icon: Sparkles, color: "text-cyan-500", bg: "bg-cyan-50" },
-  { name: "Técnico Aire", icon: Wind, color: "text-sky-500", bg: "bg-sky-50" },
-  { name: "Albañil", icon: Building, color: "text-stone-500", bg: "bg-stone-50" },
-];
-
-function ProviderCard({ provider, onRequest }: { provider: Provider; onRequest: (id: string, category: string) => void }) {
-  const cat = CATEGORIES.find(c => provider.categories.includes(c.name));
-  const Icon = cat?.icon ?? Wrench;
-  return (
-    <Link to={`/provider/${provider.id}`}>
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 card-hover cursor-pointer">
-        <div className="flex items-start gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center shrink-0 text-xl font-bold text-green-700">
-            {provider.users?.avatar_url
-              ? <img src={provider.users.avatar_url} alt="" className="h-14 w-14 rounded-2xl object-cover" />
-              : provider.users?.name?.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-gray-900">{provider.users?.name ?? "Prestador"}</h3>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {provider.categories.slice(0,2).map(c => {
-                    const cc = CATEGORIES.find(x => x.name === c);
-                    return <span key={c} className={`text-xs font-medium px-2 py-0.5 rounded-lg ${cc?.bg ?? "bg-gray-50"} ${cc?.color ?? "text-gray-500"}`}>{c}</span>;
-                  })}
-                </div>
-              </div>
-              {provider.reviews_count > 0 && (
-                <div className="text-right shrink-0">
-                  <div className="flex items-center gap-1 justify-end">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    <span className="text-sm font-semibold">{provider.rating_avg.toFixed(1)}</span>
-                  </div>
-                  <span className="text-xs text-gray-400">({provider.reviews_count})</span>
-                </div>
-              )}
-            </div>
-            {provider.bio && <p className="text-sm text-gray-400 mt-2 line-clamp-2">{provider.bio}</p>}
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-1 text-xs text-gray-400">
-                <MapPin className="h-3 w-3" /> Radio {provider.service_radius_km} km
-              </div>
-              <div className="flex items-center gap-2">
-                {provider.documents_verified && (
-                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Verificado
-                  </span>
-                )}
-                <span className={`text-xs font-medium ${provider.is_available ? "text-green-600" : "text-gray-400"}`}>
-                  {provider.is_available ? "● Disponible" : "â—‹ No disponible"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="px-5 pb-4 pt-0">
-        <button
-          onClick={e => { e.preventDefault(); onRequest(provider.id, provider.categories[0]); }}
-          className="w-full h-10 bg-green-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
-          <Send className="h-4 w-4" /> Solicitar servicio
-        </button>
-      </div>
-    </Link>
-  );
-}
+import type { Provider } from "../types";
+import { useTheme } from "../lib/theme";
+import { CATEGORIES, categoryById, mapProvider } from "../lib/categories";
+import { Chip, ProviderCard } from "../components/mobile/kit";
+import { Icon, CategoryIcon } from "../components/mobile/Icon";
+import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 
 export default function Search() {
-  const { user } = useAuth();
+  const t = useTheme();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [query, setQuery] = useState("");
+  const [cat, setCat] = useState<string | null>(searchParams.get("category"));
+  const [minRating, setMinRating] = useState<"all" | "4" | "4.5">("all");
+  const [sort, setSort] = useState<"rating" | "reviews">("rating");
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    category: searchParams.get("category") ?? "",
-    minRating: "0",
-    onlyAvailable: false,
-    onlyVerified: false,
-  });
+  const userCity = user?.city?.trim() || null;
+  const [zone, setZone] = useState<"city" | "all">("all");
+
+  // Por defecto se busca en la ciudad del usuario (cuando la tiene cargada)
+  useEffect(() => { if (userCity) setZone("city"); }, [userCity]);
 
   const search = useCallback(async () => {
     setLoading(true);
-    let q = supabase.from("providers").select("*, users(*)", { count: "exact" })
-      .eq("is_available", true).order("rating_avg", { ascending: false }).limit(30);
-    if (filters.category) q = q.contains("categories", [filters.category]);
-    if (parseFloat(filters.minRating) > 0) q = q.gte("rating_avg", parseFloat(filters.minRating));
-    if (filters.onlyVerified) q = q.eq("documents_verified", true);
-    const { data, count } = await q;
-    setProviders((data as Provider[]) ?? []);
-    setTotal(count ?? 0);
+    const byCity = zone === "city" && !!userCity;
+    let q = supabase.from("providers")
+      .select(byCity ? "*, users!inner(id,name,avatar_url,city)" : "*, users(id,name,avatar_url,city)")
+      .eq("is_available", true).limit(40);
+    if (byCity) q = q.ilike("users.city", userCity!);
+    const dbName = cat ? categoryById(cat)?.dbName : undefined;
+    if (dbName) q = q.contains("categories", [dbName]);
+    if (minRating === "4") q = q.gte("rating_avg", 4);
+    if (minRating === "4.5") q = q.gte("rating_avg", 4.5);
+    if (sort === "reviews") q = q.order("reviews_count", { ascending: false });
+    else q = q.order("rating_avg", { ascending: false }).order("reviews_count", { ascending: false });
+    const { data } = await q;
+    setProviders((data as unknown as Provider[]) ?? []);
     setLoading(false);
-  }, [filters]);
+  }, [cat, minRating, sort, zone, userCity]);
 
   useEffect(() => { search(); }, [search]);
 
-  const activeFilters = [filters.onlyVerified, filters.onlyAvailable, parseFloat(filters.minRating) > 0].filter(Boolean).length;
+  // Filtro por texto (client-side, sobre nombre y categoría)
+  const results = providers
+    .map(mapProvider)
+    .filter(p => !query || p.name.toLowerCase().includes(query.toLowerCase()) || (p.categoryLabel ?? "").toLowerCase().includes(query.toLowerCase()));
+
+  const catObj = cat ? categoryById(cat) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 flex items-center gap-3 h-16">
-          <Link to="/" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </Link>
-          <div className="flex-1 relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              className="w-full h-10 bg-gray-100 rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all"
-              placeholder="Buscar servicio..."
-            />
+    <MobileScreen>
+      <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
+        {/* top bar */}
+        <div style={{ padding: "54px 16px 0", display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => navigate("/home")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="arrow-left" size={20} color={t.ink} />
+          </button>
+          <div style={{ flex: 1, height: 44, background: t.surface, border: `1px solid ${t.line}`, borderRadius: t.radius, display: "flex", alignItems: "center", padding: "0 14px", gap: 10 }}>
+            <Icon name="search" size={18} color={t.inkSoft} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar profesional o servicio..." style={{ all: "unset", flex: 1, fontFamily: t.fontBody, fontSize: 14.5, color: t.ink }} />
+            {query && <button onClick={() => setQuery("")} style={{ all: "unset", cursor: "pointer" }}><Icon name="close" size={16} color={t.inkSoft} /></button>}
           </div>
-          <button onClick={() => setShowFilters(!showFilters)}
-            className={`relative p-2 rounded-xl transition-colors ${showFilters ? "bg-green-600 text-white" : "hover:bg-gray-100 text-gray-600"}`}>
-            <SlidersHorizontal className="h-5 w-5" />
-            {activeFilters > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-600 text-white text-xs rounded-full flex items-center justify-center">{activeFilters}</span>}
+          <button onClick={() => setShowFilters(s => !s)} style={{ all: "unset", cursor: "pointer", width: 44, height: 44, borderRadius: 999, background: showFilters ? t.ink : t.surface, border: `1px solid ${showFilters ? t.ink : t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name="sliders" size={20} color={showFilters ? "#fff" : t.ink} />
           </button>
         </div>
 
-        {/* Filters panel */}
+        {/* chips de categoría */}
+        <div style={{ padding: "14px 0 6px" }}>
+          <div style={{ display: "flex", gap: 8, padding: "0 16px", overflowX: "auto" }} className="scrollbar-hide">
+            <Chip active={!cat} onClick={() => setCat(null)}>Todas</Chip>
+            {CATEGORIES.map(c => (
+              <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} icon={<CategoryIcon name={c.id} size={14} color={cat === c.id ? "#fff" : c.hue} />}>{c.label}</Chip>
+            ))}
+          </div>
+        </div>
+
+        {/* orden */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 20px 6px" }}>
+          <div style={{ fontFamily: t.fontBody, fontSize: 13, color: t.inkMute }}>
+            <strong style={{ color: t.ink, fontWeight: 700 }}>{results.length}</strong> resultados{catObj ? ` · ${catObj.label}` : ""}{zone === "city" && userCity ? ` · ${userCity}` : ""}
+          </div>
+          <select value={sort} onChange={e => setSort(e.target.value as "rating" | "reviews")} style={{
+            all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 600, color: t.ink,
+            padding: "6px 24px 6px 12px", background: t.surfaceAlt, borderRadius: 999,
+            backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(t.ink)}' stroke-width='2.5'><path d='M6 9l6 6 6-6'/></svg>")`,
+            backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center",
+            WebkitAppearance: "none", MozAppearance: "none", appearance: "none",
+          }}>
+            <option value="rating">Mejor calificación</option>
+            <option value="reviews">Más reseñas</option>
+          </select>
+        </div>
+
+        {/* filtros */}
         {showFilters && (
-          <div className="border-t border-gray-100 bg-white px-4 py-4 max-w-2xl mx-auto">
-            <div className="flex flex-wrap gap-2">
-              <select value={filters.minRating} onChange={e => setFilters(f => ({...f, minRating: e.target.value}))}
-                className="h-9 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="0">Cualquier calificacion</option>
-                <option value="3">3+ estrellas</option>
-                <option value="4">4+ estrellas</option>
-                <option value="4.5">4.5+ estrellas</option>
-              </select>
-              <button onClick={() => setFilters(f => ({...f, onlyVerified: !f.onlyVerified}))}
-                className={`h-9 px-4 rounded-xl text-sm font-medium border transition-colors ${filters.onlyVerified ? "bg-green-600 text-white border-green-600" : "border-gray-200 hover:border-green-300"}`}>
-                Verificados
-              </button>
-              {activeFilters > 0 && (
-                <button onClick={() => setFilters({category: filters.category, minRating: "0", onlyAvailable: false, onlyVerified: false})}
-                  className="h-9 px-3 rounded-xl text-sm text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors">
-                  <X className="h-4 w-4" /> Limpiar
-                </button>
-              )}
+          <div style={{ padding: "8px 20px 12px", borderBottom: `1px solid ${t.lineSoft}` }}>
+            <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Calificación mínima</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {([{ id: "all", label: "Todas" }, { id: "4", label: "4+ ★" }, { id: "4.5", label: "4.5+ ★" }] as const).map(opt => (
+                <Chip key={opt.id} active={minRating === opt.id} onClick={() => setMinRating(opt.id)}>{opt.label}</Chip>
+              ))}
             </div>
+            {userCity && (
+              <>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", margin: "12px 0 8px" }}>Zona</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Chip active={zone === "city"} onClick={() => setZone("city")} icon={<Icon name="pin-fill" size={13} color={zone === "city" ? "#fff" : t.green} />}>{userCity}</Chip>
+                  <Chip active={zone === "all"} onClick={() => setZone("all")}>Todo el país</Chip>
+                </div>
+              </>
+            )}
           </div>
         )}
-      </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-5">
-        {/* Category pills */}
-        <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide mb-5">
-          <button onClick={() => setFilters(f => ({...f, category: ""}))}
-            className={`shrink-0 h-9 px-4 rounded-xl text-sm font-medium transition-colors ${!filters.category ? "bg-green-600 text-white" : "bg-white border border-gray-200 hover:border-green-300 text-gray-600"}`}>
-            Todos
-          </button>
-          {CATEGORIES.map(({ name, icon: Icon, color, bg }) => (
-            <button key={name} onClick={() => setFilters(f => ({...f, category: f.category === name ? "" : name}))}
-              className={`shrink-0 h-9 pl-3 pr-4 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${filters.category === name ? "bg-green-600 text-white" : "bg-white border border-gray-200 hover:border-green-300 text-gray-600"}`}>
-              <Icon className={`h-3.5 w-3.5 ${filters.category === name ? "text-white" : color}`} />
-              {name}
-            </button>
-          ))}
+        {/* resultados */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 100px", display: "flex", flexDirection: "column", gap: 10 }}>
+          {loading ? (
+            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>Buscando...</div>
+          ) : results.length === 0 ? (
+            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>🔍</div>
+              {zone === "city" && userCity ? (
+                <>
+                  <div>Sin resultados en {userCity}.</div>
+                  <button onClick={() => setZone("all")} style={{ all: "unset", cursor: "pointer", marginTop: 12, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: t.green }}>
+                    Buscar en todo el país
+                  </button>
+                </>
+              ) : "Sin resultados. Probá con otra categoría."}
+            </div>
+          ) : results.map(p => <ProviderCard key={p.id} provider={p} onClick={() => navigate(`/provider/${p.id}`)} />)}
         </div>
 
-        {/* Results count */}
-        <p className="text-sm text-gray-400 mb-4">
-          {loading ? "Buscando..." : `${total} prestador${total !== 1 ? "es" : ""} encontrado${total !== 1 ? "s" : ""}`}
-        </p>
-
-        {/* Results */}
-        {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-green-600" /></div>
-        ) : providers.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <SearchIcon className="h-7 w-7 text-gray-300" />
-            </div>
-            <p className="font-semibold text-gray-500">No encontramos prestadores</p>
-            <p className="text-sm text-gray-400 mt-1">Probá cambiando los filtros</p>
-          </div>
-        ) : (
-          <div className="space-y-3">{providers.map(p => <ProviderCard key={p.id} provider={p} onRequest={(id, cat) => navigate(`/jobs/new?provider=${id}&category=${cat}`)} />)}</div>
-        )}
+        <TabBar active="search" />
       </div>
-    </div>
+    </MobileScreen>
   );
 }

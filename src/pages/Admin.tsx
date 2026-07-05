@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { useToast } from '../components/ui/use-toast';
-import { Users, Briefcase, CreditCard, Shield, Home, Search, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Users, Briefcase, CreditCard, Shield, Home, Search, CheckCircle, XCircle, Loader2, Wallet, Plus, Trash2, Save } from 'lucide-react';
+import { calculateCommission, formatARS, type CommissionTier } from '../lib/commission';
 
 function StatCard({ icon: Icon, label, value, color }: any) {
   return (
@@ -33,12 +34,14 @@ function AdminUsers() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('users').select('*').order('created_at', { ascending: false }).limit(50)
-      .then(({ data }) => { setUsers(data ?? []); setLoading(false); });
+    // RPC con check de admin: la lectura directa de users ya no expone emails
+    supabase.rpc('admin_list_users', { p_limit: 50 })
+      .then(({ data }) => { setUsers((data as User[]) ?? []); setLoading(false); });
   }, []);
 
   async function toggleBlock(user: User) {
-    await supabase.from('users').update({ is_blocked: !user.is_blocked }).eq('id', user.id);
+    const { error } = await supabase.rpc('admin_set_blocked', { p_user: user.id, p_blocked: !user.is_blocked });
+    if (error) { toast({ title: 'Error al actualizar', variant: 'destructive' }); return; }
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_blocked: !u.is_blocked } : u));
     toast({ title: user.is_blocked ? 'Usuario desbloqueado' : 'Usuario bloqueado' });
   }
@@ -91,7 +94,7 @@ function AdminProviders() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('providers').select('*, users(*)').order('created_at', { ascending: false })
+    supabase.from('providers').select('*, users(id,name,avatar_url,city)').order('created_at', { ascending: false })
       .then(({ data }) => { setProviders(data as Provider[] ?? []); setLoading(false); });
   }, []);
 
@@ -138,7 +141,7 @@ function AdminJobs() {
 
   useEffect(() => {
     supabase.from('jobs')
-      .select('*, clients:users!jobs_client_id_fkey(*), providers(*, users(*))')
+      .select('*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))')
       .order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { setJobs(data as Job[] ?? []); setLoading(false); });
   }, []);
@@ -174,6 +177,171 @@ function AdminJobs() {
   );
 }
 
+// ---- Commission Tiers Admin ----
+function AdminCommission() {
+  const { toast } = useToast();
+  const [tiers, setTiers] = useState<CommissionTier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<string>('50000');
+
+  useEffect(() => {
+    supabase.from('app_config').select('value').eq('key', 'commission_tiers').single()
+      .then(({ data }) => {
+        setTiers((data?.value as CommissionTier[]) ?? []);
+        setLoading(false);
+      });
+  }, []);
+
+  function updateTier(i: number, patch: Partial<CommissionTier>) {
+    setTiers(prev => prev.map((t, idx) => idx === i ? { ...t, ...patch } : t));
+  }
+  function addTier() {
+    const last = tiers[tiers.length - 1];
+    const newMax = last && last.max !== null ? last.max + 50000 : 50000;
+    const insertAt = tiers.findIndex(t => t.max === null);
+    const next: CommissionTier = { max: newMax, fee: 5000 };
+    setTiers(prev => insertAt === -1 ? [...prev, next] : [
+      ...prev.slice(0, insertAt), next, ...prev.slice(insertAt),
+    ]);
+  }
+  function removeTier(i: number) {
+    setTiers(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  function validate(): string | null {
+    if (tiers.length === 0) return 'Debe haber al menos un tramo';
+    const nullCount = tiers.filter(t => t.max === null).length;
+    if (nullCount !== 1) return 'Debe haber exactamente un tramo con tope abierto (sin tope)';
+    if (tiers[tiers.length - 1].max !== null) return 'El tramo sin tope debe ser el último';
+    for (let i = 0; i < tiers.length; i++) {
+      if (tiers[i].fee < 0) return `Tramo ${i + 1}: la comisión no puede ser negativa`;
+      if (tiers[i].max !== null && tiers[i].max! <= 0) return `Tramo ${i + 1}: el tope debe ser positivo`;
+      if (i > 0) {
+        const prev = tiers[i - 1].max;
+        const curr = tiers[i].max;
+        if (prev !== null && curr !== null && curr <= prev) {
+          return `Tramo ${i + 1}: el tope debe ser mayor que el anterior`;
+        }
+      }
+    }
+    return null;
+  }
+
+  async function save() {
+    const err = validate();
+    if (err) { toast({ title: 'Configuración inválida', description: err, variant: 'destructive' }); return; }
+    setSaving(true);
+    const { error } = await supabase.from('app_config')
+      .update({ value: tiers })
+      .eq('key', 'commission_tiers');
+    setSaving(false);
+    if (error) toast({ title: 'Error al guardar', description: error.message, variant: 'destructive' });
+    else toast({ title: 'Tramos actualizados', description: 'Aplicará a los nuevos pagos' });
+  }
+
+  const previewAmount = parseFloat(preview) || 0;
+  const previewBreakdown = calculateCommission(previewAmount, tiers);
+
+  if (loading) return <Loader2 className="h-6 w-6 animate-spin" />;
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wallet className="h-4 w-4 text-emerald-600" /> Tramos de comisión
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Cada tramo aplica si el precio del trabajo es menor o igual al tope. El último tramo (sin tope)
+            aplica a todo lo que excede al anterior. Los cambios afectan únicamente a los pagos nuevos.
+          </p>
+          <div className="space-y-2">
+            {tiers.map((t, i) => {
+              const prevMax = i > 0 ? tiers[i - 1].max : 0;
+              return (
+                <div key={i} className="flex items-center gap-2 p-3 border rounded-xl bg-card">
+                  <div className="text-xs text-muted-foreground w-24">
+                    Desde {formatARS((prevMax ?? 0) + (i > 0 ? 1 : 0))}
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Tope (max)</label>
+                      <Input
+                        type="number"
+                        placeholder="Sin tope"
+                        value={t.max ?? ''}
+                        onChange={e => updateTier(i, {
+                          max: e.target.value === '' ? null : parseFloat(e.target.value),
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Comisión fija (ARS)</label>
+                      <Input
+                        type="number"
+                        value={t.fee}
+                        onChange={e => updateTier(i, { fee: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => removeTier(i)} className="text-red-500">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={addTier}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar tramo
+            </Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+              Guardar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Simulador</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-xs text-muted-foreground">Precio del trabajo (ARS)</label>
+            <Input type="number" value={preview} onChange={e => setPreview(e.target.value)} />
+          </div>
+          {previewAmount > 0 && (
+            <dl className="space-y-1 text-sm border rounded-xl p-3 bg-muted/30">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Total</dt>
+                <dd>{formatARS(previewBreakdown.amount)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Comisión</dt>
+                <dd>{formatARS(previewBreakdown.fee)}</dd>
+              </div>
+              <div className="flex justify-between font-semibold pt-1 border-t">
+                <dt>Recibe el prestador</dt>
+                <dd className="text-emerald-700">{formatARS(previewBreakdown.providerNet)}</dd>
+              </div>
+              <div className="text-xs text-muted-foreground pt-1">
+                Take rate efectivo: {previewBreakdown.amount > 0
+                  ? ((previewBreakdown.fee / previewBreakdown.amount) * 100).toFixed(1)
+                  : '0'}%
+              </div>
+            </dl>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ---- Main Admin ----
 export default function Admin() {
   const navigate = useNavigate();
@@ -197,6 +365,7 @@ export default function Admin() {
     { path: '/admin/users', label: 'Usuarios', icon: Users },
     { path: '/admin/providers', label: 'Prestadores', icon: Shield },
     { path: '/admin/jobs', label: 'Trabajos', icon: Briefcase },
+    { path: '/admin/commission', label: 'Comisiones', icon: Wallet },
   ];
 
   return (
@@ -234,6 +403,7 @@ export default function Admin() {
           <Route path="/users" element={<><h2 className="text-xl font-bold mb-6">Usuarios</h2><AdminUsers /></>} />
           <Route path="/providers" element={<><h2 className="text-xl font-bold mb-6">Prestadores</h2><AdminProviders /></>} />
           <Route path="/jobs" element={<><h2 className="text-xl font-bold mb-6">Trabajos</h2><AdminJobs /></>} />
+          <Route path="/commission" element={<><h2 className="text-xl font-bold mb-6">Comisiones</h2><AdminCommission /></>} />
         </Routes>
       </div>
     </div>

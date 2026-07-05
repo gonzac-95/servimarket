@@ -42,7 +42,31 @@ CREATE TABLE public.providers (
   rating_avg          NUMERIC(3,2) DEFAULT 0,
   reviews_count       INTEGER DEFAULT 0,
   is_available        BOOLEAN DEFAULT TRUE,
+  mp_user_id          TEXT,               -- MP user_id si ya conectó OAuth (público)
+  mp_connected_at     TIMESTAMPTZ,
   created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Credenciales OAuth MP del prestador. Sólo accesible por service role.
+CREATE TABLE public.provider_mp_credentials (
+  provider_id    UUID PRIMARY KEY REFERENCES public.providers(id) ON DELETE CASCADE,
+  mp_user_id     TEXT NOT NULL,
+  access_token   TEXT NOT NULL,
+  refresh_token  TEXT NOT NULL,
+  expires_at     TIMESTAMPTZ NOT NULL,
+  public_key     TEXT,
+  scope          TEXT,
+  live_mode      BOOLEAN DEFAULT FALSE,
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- States del flujo OAuth (single-use, anti-replay).
+CREATE TABLE public.oauth_states (
+  state         TEXT PRIMARY KEY,
+  provider_id   UUID NOT NULL REFERENCES public.providers(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  consumed_at   TIMESTAMPTZ
 );
 
 -- ============================================================
@@ -103,18 +127,43 @@ CREATE TYPE payment_status AS ENUM (
 );
 
 CREATE TABLE public.payments (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  job_id              UUID NOT NULL REFERENCES public.jobs(id),
-  amount              NUMERIC(10,2) NOT NULL,
-  provider_share      NUMERIC(10,2),   -- 80% por defecto
-  platform_fee        NUMERIC(10,2),   -- 20% por defecto
-  status              payment_status DEFAULT 'pending',
-  payment_provider    TEXT CHECK (payment_provider IN ('mercadopago', 'stripe')),
-  provider_payment_id TEXT,            -- ID de MP o Stripe
-  preference_id       TEXT,            -- MP preference_id
-  checkout_url        TEXT,
-  created_at          TIMESTAMPTZ DEFAULT NOW(),
-  updated_at          TIMESTAMPTZ DEFAULT NOW()
+  id                        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  job_id                    UUID NOT NULL REFERENCES public.jobs(id),
+  amount                    NUMERIC(10,2) NOT NULL,
+  provider_share            NUMERIC(10,2),   -- monto neto al prestador (= amount - platform_fee)
+  platform_fee              NUMERIC(10,2),   -- comisión fija calculada por tramo
+  commission_tiers_snapshot JSONB,           -- snapshot auditable de tramos vigentes al momento del pago
+  status                    payment_status DEFAULT 'pending',
+  payment_provider          TEXT CHECK (payment_provider IN ('mercadopago', 'stripe')),
+  provider_payment_id       TEXT,            -- ID de MP o Stripe
+  preference_id             TEXT,            -- MP preference_id
+  checkout_url              TEXT,
+  created_at                TIMESTAMPTZ DEFAULT NOW(),
+  updated_at                TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT payments_fee_lte_amount CHECK (platform_fee IS NULL OR platform_fee <= amount)
+);
+
+-- ============================================================
+-- APP CONFIG (configuración global editable desde admin)
+-- ============================================================
+CREATE TABLE public.app_config (
+  key         TEXT PRIMARY KEY,
+  value       JSONB NOT NULL,
+  description TEXT,
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_by  UUID REFERENCES public.users(id)
+);
+
+-- Tramos de comisión por defecto (mayo 2026, ARS)
+INSERT INTO public.app_config (key, value, description) VALUES
+('commission_tiers',
+ '[
+    {"max": 30000,  "fee": 2500},
+    {"max": 100000, "fee": 7000},
+    {"max": 300000, "fee": 15000},
+    {"max": null,   "fee": 25000}
+  ]'::jsonb,
+ 'Tramos de comisión fija aplicados al precio del trabajo. El primero cuyo max >= price gana.'
 );
 
 -- ============================================================
@@ -148,6 +197,29 @@ CREATE TRIGGER jobs_updated_at
 CREATE TRIGGER payments_updated_at
   BEFORE UPDATE ON public.payments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER app_config_updated_at
+  BEFORE UPDATE ON public.app_config
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Calcula la comisión fija aplicable a un precio según los tramos vigentes.
+CREATE OR REPLACE FUNCTION public.calculate_commission(price NUMERIC)
+RETURNS NUMERIC AS $$
+DECLARE
+  tiers JSONB;
+  tier  JSONB;
+BEGIN
+  IF price IS NULL OR price <= 0 THEN RETURN 0; END IF;
+  SELECT value INTO tiers FROM public.app_config WHERE key = 'commission_tiers';
+  IF tiers IS NULL THEN RETURN 0; END IF;
+  FOR tier IN SELECT * FROM jsonb_array_elements(tiers) LOOP
+    IF (tier->>'max') IS NULL OR price <= (tier->>'max')::NUMERIC THEN
+      RETURN (tier->>'fee')::NUMERIC;
+    END IF;
+  END LOOP;
+  RETURN ((tiers->-1)->>'fee')::NUMERIC;
+END;
+$$ LANGUAGE plpgsql STABLE;
 
 -- Auto-update provider rating after review insert
 CREATE OR REPLACE FUNCTION update_provider_rating()
@@ -201,6 +273,17 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.provider_mp_credentials ENABLE ROW LEVEL SECURITY;
+-- Sin policies: sólo service role accede a tokens.
+ALTER TABLE public.oauth_states ENABLE ROW LEVEL SECURITY;
+-- Sin policies: sólo service role accede a states.
+
+-- App config: lectura pública (los tramos no son secretos), escritura solo admin
+CREATE POLICY "AppConfig read all" ON public.app_config FOR SELECT USING (true);
+CREATE POLICY "AppConfig write admin" ON public.app_config FOR ALL
+  USING ((SELECT role FROM public.users WHERE id = auth.uid()) = 'admin')
+  WITH CHECK ((SELECT role FROM public.users WHERE id = auth.uid()) = 'admin');
 
 -- Users: can read all, only update own
 CREATE POLICY "Users read all"    ON public.users FOR SELECT USING (true);

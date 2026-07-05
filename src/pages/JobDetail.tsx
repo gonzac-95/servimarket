@@ -1,105 +1,173 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
-import { Job, Message } from "../types";
-import { useToast } from "../components/ui/use-toast";
-import { ArrowLeft, Send, Loader2, Star, CheckCircle2, XCircle, Play, MapPin, Calendar, Clock, DollarSign, Tag } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import type { Job, Message, Payment } from "../types";
+import { calculateCommission, useCommissionTiers } from "../lib/commission";
+import { useTheme, fmtARS } from "../lib/theme";
+import { categoryByDbName } from "../lib/categories";
+import { Avatar, Button, Field, toast } from "../components/mobile/kit";
+import { Icon, CategoryIcon } from "../components/mobile/Icon";
+import { MobileScreen } from "../components/mobile/MobileScreen";
+import { format } from "date-fns";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  pending:     { label: "Pendiente",   color: "bg-amber-50 text-amber-700 border-amber-200",    dot: "bg-amber-400" },
-  accepted:    { label: "Aceptado",    color: "bg-blue-50 text-blue-700 border-blue-200",       dot: "bg-blue-400" },
-  in_progress: { label: "En progreso", color: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-400" },
-  completed:   { label: "Completado",  color: "bg-green-50 text-green-700 border-green-200",    dot: "bg-green-500" },
-  cancelled:   { label: "Cancelado",   color: "bg-gray-50 text-gray-400 border-gray-200",       dot: "bg-gray-300" },
-};
+// ── Comisión: desglose para prestador/cliente ──
+function CommissionBreakdown({ amount, role }: { amount: number; role: "provider" | "client" }) {
+  const t = useTheme();
+  const { tiers } = useCommissionTiers();
+  const b = calculateCommission(amount, tiers);
+  if (b.amount <= 0) return null;
+  const isProvider = role === "provider";
+  return (
+    <div style={{ background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: t.fontBody, fontSize: 13.5 }}>
+        <span style={{ color: t.inkMute }}>Total del trabajo</span><span style={{ color: t.ink, fontWeight: 600 }}>{fmtARS(b.amount)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: t.fontBody, fontSize: 13.5 }}>
+        <span style={{ color: t.inkMute }}>Comisión ServiMarket</span><span style={{ color: t.inkMute }}>- {fmtARS(b.fee)}</span>
+      </div>
+      <div style={{ height: 1, background: t.line, margin: "2px 0" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <span style={{ fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: t.ink }}>{isProvider ? "Recibís" : "El prestador recibe"}</span>
+        <span style={{ fontFamily: t.fontDisplay, fontSize: 20, fontWeight: 700, color: t.green }}>{fmtARS(b.providerNet)}</span>
+      </div>
+    </div>
+  );
+}
 
-function ReviewModal({ jobId, providerId, onDone }: { jobId: string; providerId: string; onDone: () => void }) {
+// ── Sección de pago (create-payment + realtime status) ──
+function PaymentSection({ job, isClient, onPaymentChange }: { job: Job; isClient: boolean; onPaymentChange: () => void }) {
+  const t = useTheme();
+  const [payment, setPayment] = useState<Payment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+
+  const loadPayment = useCallback(async () => {
+    const { data } = await supabase.from("payments").select("*").eq("job_id", job.id)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    setPayment(data as Payment | null);
+    setLoading(false);
+  }, [job.id]);
+
+  useEffect(() => {
+    loadPayment();
+    const sub = supabase.channel(`payment:${job.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "payments", filter: `job_id=eq.${job.id}` },
+        () => { loadPayment(); onPaymentChange(); })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [job.id, loadPayment, onPaymentChange]);
+
+  async function startPayment() {
+    setPaying(true);
+    const { data, error } = await supabase.functions.invoke("create-payment", { body: { job_id: job.id } });
+    setPaying(false);
+    if (error || !data?.checkout_url) {
+      const code = (data as any)?.error;
+      const msg = code === "provider_not_connected"
+        ? "El prestador todavía no conectó su cuenta de MercadoPago."
+        : (data as any)?.message ?? error?.message ?? code ?? "Intentalo de nuevo";
+      toast(msg, "shield");
+      return;
+    }
+    window.location.href = data.checkout_url;
+  }
+
+  if (loading) return null;
+
+  const banner = (bg: string, border: string, fg: string, title: string, sub: string, icon: string) => (
+    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: t.radius, padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
+      <Icon name={icon} size={20} color={fg} />
+      <div><div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 14, color: fg }}>{title}</div>
+        <div style={{ fontFamily: t.fontBody, fontSize: 12, color: fg, opacity: 0.85 }}>{sub}</div></div>
+    </div>
+  );
+
+  if (payment?.status === "approved") return banner(t.greenSoft, t.greenSoft, t.greenDeep, "Pago confirmado", "El cobro fue acreditado correctamente", "check-circle");
+  if (payment?.status === "rejected") return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {banner("rgba(192,57,43,0.06)", "rgba(192,57,43,0.20)", t.danger, "Pago rechazado", "El cobro no pudo procesarse", "shield")}
+      {isClient && <Button variant="green" size="lg" full onClick={startPayment} disabled={paying} icon={<Icon name="wallet" size={18} color="#fff" />}>{paying ? "Procesando..." : "Reintentar pago"}</Button>}
+    </div>
+  );
+  if (payment?.status === "pending" && payment?.checkout_url) {
+    if (!isClient) return banner("rgba(232,168,43,0.10)", "rgba(232,168,43,0.30)", "#9B6B12", "Esperando pago del cliente", "Te avisamos cuando se acredite", "clock");
+    return <a href={payment.checkout_url} style={{ textDecoration: "none" }}><Button variant="green" size="lg" full icon={<Icon name="wallet" size={18} color="#fff" />}>Continuar pago</Button></a>;
+  }
+  if (isClient && job.price && job.price > 0 && ["accepted", "in_progress", "completed"].includes(job.status)) {
+    return <Button variant="green" size="lg" full onClick={startPayment} disabled={paying} icon={<Icon name="shield" size={18} color="#fff" />}>{paying ? "Procesando..." : `Pagar ${fmtARS(job.price)} con MercadoPago`}</Button>;
+  }
+  return null;
+}
+
+// ── Reseña ──
+function ReviewCard({ jobId, providerId, onDone }: { jobId: string; providerId: string; onDone: () => void }) {
+  const t = useTheme();
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [rating, setRating] = useState(5);
-  const [hovered, setHovered] = useState(0);
+  const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
-
   async function submit() {
+    if (rating === 0) return;
     setLoading(true);
     const { error } = await supabase.from("reviews").insert({ job_id: jobId, client_id: user!.id, provider_id: providerId, rating, comment });
     setLoading(false);
-    if (error) { toast({ title: "Error al enviar reseí±a", variant: "destructive" }); return; }
-    toast({ title: "Gracias por tu reseí±a!" });
+    if (error) { toast("Error al enviar reseña", "shield"); return; }
+    toast("¡Gracias por tu reseña!", "star");
     onDone();
   }
-
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5">
-      <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Star className="h-4 w-4 text-amber-400" /> Dejar una reseí±a
-      </h3>
-      <div className="flex gap-1 mb-4">
-        {[1,2,3,4,5].map(i => (
-          <button key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(0)} onClick={() => setRating(i)}>
-            <Star className={`h-8 w-8 transition-colors ${i <= (hovered || rating) ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />
+    <div style={{ background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, padding: 18 }}>
+      <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 15, color: t.ink, marginBottom: 12 }}>Calificá el trabajo</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[1, 2, 3, 4, 5].map(n => (
+          <button key={n} onClick={() => setRating(n)} style={{ all: "unset", cursor: "pointer" }}>
+            <Icon name={n <= rating ? "star" : "star-outline"} size={34} color={n <= rating ? t.star : t.line} />
           </button>
         ))}
       </div>
-      <textarea
-        className="w-full min-h-[80px] border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500 mb-3"
-        placeholder="Contá tu experiencia..."
-        value={comment}
-        onChange={e => setComment(e.target.value)}
-      />
-      <button onClick={submit} disabled={loading}
-        className="w-full h-11 bg-green-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-50">
-        {loading && <Loader2 className="h-4 w-4 animate-spin" />} Enviar reseí±a
-      </button>
+      <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Contá tu experiencia..."
+        style={{ width: "100%", minHeight: 80, boxSizing: "border-box", resize: "none", padding: "12px 14px", background: t.surfaceAlt, border: `1px solid ${t.line}`, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, color: t.ink, outline: "none", marginBottom: 12 }} />
+      <Button variant="green" size="lg" full disabled={rating === 0 || loading} onClick={submit}>Publicar reseña</Button>
     </div>
   );
 }
 
 export default function JobDetail() {
+  const t = useTheme();
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [hasReview, setHasReview] = useState(false);
+  const [paymentApproved, setPaymentApproved] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
-  const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [quoteForm, setQuoteForm] = useState({ amount: "", description: "" });
   const [sendingQuote, setSendingQuote] = useState(false);
+  const [tab, setTab] = useState<"chat" | "resumen">("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { tiers } = useCommissionTiers();
 
   const loadJob = useCallback(async () => {
-    const { data } = await supabase.from("jobs")
-      .select("*, clients:users!jobs_client_id_fkey(*), providers(*, users(*))")
-      .eq("id", id).single();
-    setJob(data);
-    setLoading(false);
+    const { data } = await supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))").eq("id", id).single();
+    setJob(data); setLoading(false);
   }, [id]);
-
   const loadMessages = useCallback(async () => {
-    const { data } = await supabase.from("messages").select("*, users(*)")
-      .eq("job_id", id).order("created_at", { ascending: true });
+    const { data } = await supabase.from("messages").select("*").eq("job_id", id).order("created_at", { ascending: true });
     setMessages(data ?? []);
   }, [id]);
-
   const loadQuotes = useCallback(async () => {
-    const { data } = await supabase.from("quotes").select("*, providers(*, users(*))")
-      .eq("job_id", id).order("created_at", { ascending: false });
+    const { data } = await supabase.from("quotes").select("*, providers(*, users(id,name,avatar_url))").eq("job_id", id).order("created_at", { ascending: false });
     setQuotes(data ?? []);
   }, [id]);
 
   useEffect(() => {
-    loadJob();
-    loadMessages();
-    loadQuotes();
+    loadJob(); loadMessages(); loadQuotes();
     const sub = supabase.channel(`job:${id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `job_id=eq.${id}` },
         (payload) => setMessages(prev => [...prev, payload.new as Message]))
@@ -107,266 +175,256 @@ export default function JobDetail() {
         () => loadJob())
       .subscribe();
     return () => { supabase.removeChannel(sub); };
-  }, [id, loadJob, loadMessages]);
+  }, [id, loadJob, loadMessages, loadQuotes]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   useEffect(() => {
-    if (job?.status === "completed" && user?.role === "client") {
-      supabase.from("reviews").select("id").eq("job_id", id).single().then(({ data }) => setHasReview(!!data));
-    }
+    const r = searchParams.get("payment");
+    if (!r) return;
+    const map: Record<string, string> = { success: "Pago iniciado. Acreditándose...", pending: "Pago en proceso.", failure: "El pago no pudo completarse" };
+    if (map[r]) toast(map[r], r === "failure" ? "shield" : "check");
+    searchParams.delete("payment"); setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (job?.status === "completed" && user?.role === "client")
+      supabase.from("reviews").select("id").eq("job_id", id).maybeSingle().then(({ data }) => setHasReview(!!data));
   }, [job, id, user]);
+  useEffect(() => {
+    if (job?.status === "completed")
+      supabase.from("payments").select("id").eq("job_id", id).eq("status", "approved").maybeSingle().then(({ data }) => setPaymentApproved(!!data));
+  }, [job, id]);
 
   async function sendMessage() {
     if (!text.trim() || !user) return;
     setSending(true);
     await supabase.from("messages").insert({ job_id: id, sender_id: user.id, text: text.trim() });
-    setText("");
-    setSending(false);
+    setText(""); setSending(false);
   }
-
   async function updateStatus(status: string) {
     const { error } = await supabase.from("jobs").update({ status }).eq("id", id);
-    if (error) toast({ title: "Error al actualizar estado", variant: "destructive" });
+    if (error) toast("Error al actualizar", "shield");
+  }
+  async function markProviderDone() {
+    const { error } = await supabase.from("jobs").update({ provider_completed_at: new Date().toISOString() }).eq("id", id);
+    if (error) { toast("Error al marcar", "shield"); return; }
+    await loadJob(); toast("Trabajo marcado como terminado", "check");
+  }
+  async function confirmCompletion() {
+    const { error } = await supabase.from("jobs").update({ status: "completed", client_confirmed_at: new Date().toISOString() }).eq("id", id);
+    if (error) { toast("Error al confirmar", "shield"); return; }
+    await loadJob(); toast("¡Trabajo confirmado!", "check");
+  }
+  async function acceptQuote(q: any) {
+    await supabase.from("quotes").update({ status: "accepted" }).eq("id", q.id);
+    await supabase.from("jobs").update({ price: q.amount, status: "accepted" }).eq("id", id);
+    loadQuotes(); loadJob();
+  }
+  async function rejectQuote(q: any) {
+    await supabase.from("quotes").update({ status: "rejected" }).eq("id", q.id); loadQuotes();
+  }
+  async function sendQuote() {
+    if (!job?.provider_id || !quoteForm.amount) return;
+    setSendingQuote(true);
+    await supabase.from("quotes").insert({ job_id: id, provider_id: job.provider_id, amount: parseFloat(quoteForm.amount), description: quoteForm.description });
+    await loadQuotes(); setQuoteForm({ amount: "", description: "" }); setSendingQuote(false);
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-green-600" /></div>;
-  if (!job) return <div className="text-center py-24 text-gray-400">Trabajo no encontrado</div>;
+  if (loading) return <MobileScreen><div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div></div></MobileScreen>;
+  if (!job) return <MobileScreen><div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ fontFamily: t.fontBody, color: t.inkMute }}>Trabajo no encontrado</div></div></MobileScreen>;
 
   const isClient = user?.id === job.client_id;
   const isProvider = user?.id === job.providers?.user_id;
-  const cfg = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.pending;
-  const otherName = isClient ? job.providers?.users?.name ?? "Sin asignar" : (job as any).clients?.name ?? "Cliente";
-  const otherInitial = otherName.charAt(0).toUpperCase();
-  const canChat = !["cancelled","completed"].includes(job.status);
+  const otherName = isClient ? (job.providers?.users?.name ?? "Sin asignar") : ((job as any).clients?.name ?? "Cliente");
+  const otherAvatarHue = t.green;
+  const cat = categoryByDbName(job.category);
+  const canChat = !["cancelled", "completed"].includes(job.status);
+  const awaitingConfirmation = job.status === "in_progress" && !!job.provider_completed_at;
+
+  // stepper: 0 aceptado, 1 en curso, 2 finalizado (prov), 3 confirmado
+  const stepIdx = job.status === "completed" ? 3 : awaitingConfirmation ? 2 : job.status === "in_progress" ? 1 : job.status === "accepted" ? 0 : -1;
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 flex items-center gap-3 h-16">
-          <button onClick={() => navigate("/dashboard")} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-          <div className="flex items-center gap-3 flex-1">
-            <div className="h-9 w-9 bg-green-100 rounded-xl flex items-center justify-center font-bold text-green-700 text-sm">{otherInitial}</div>
-            <div>
-              <div className="font-semibold text-sm text-gray-900">{otherName}</div>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 ${cfg.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
-              </span>
+    <MobileScreen>
+      <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
+        {/* header */}
+        <div style={{ background: t.surface, padding: "54px 16px 14px", borderBottom: `1px solid ${t.lineSoft}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={() => navigate("/dashboard")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="arrow-left" size={20} color={t.ink} />
+            </button>
+            <Avatar initials={otherName.charAt(0).toUpperCase()} hue={otherAvatarHue} size={40} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: t.fontBody, fontSize: 14.5, fontWeight: 700, color: t.ink }}>{otherName}</div>
+              <div style={{ fontFamily: t.fontBody, fontSize: 11.5, color: t.inkMute }}>{cat?.label ?? job.category}</div>
             </div>
           </div>
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-4 w-full">
-        {/* Job info */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <span className="bg-green-50 text-green-700 text-xs font-semibold px-3 py-1 rounded-xl border border-green-100">{job.category}</span>
-            {job.price && <span className="font-bold text-green-700 flex items-center gap-1"><DollarSign className="h-4 w-4" />{job.price.toLocaleString()}</span>}
-          </div>
-          <p className="text-sm text-gray-700 mb-3">{job.description}</p>
-          <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-            <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{job.address}</span>
-            {job.scheduled_at && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{format(new Date(job.scheduled_at), "d 'de' MMMM, HH:mm", { locale: es })}</span>}
-            <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{formatDistanceToNow(new Date(job.created_at), { locale: es, addSuffix: true })}</span>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        {isProvider && job.status === "pending" && (
-          <div className="space-y-3">
-            {/* Formulario de cotización */}
-            {!showQuoteForm ? (
-              <button onClick={() => setShowQuoteForm(true)}
-                className="w-full h-12 bg-white border-2 border-green-600 text-green-600 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-50 transition-colors">
-                <Tag className="h-5 w-5" /> Enviar cotización
-              </button>
-            ) : (
-              <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-                <h3 className="font-semibold text-sm text-gray-900">Enviar cotización al cliente</h3>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
-                  <input type="number" placeholder="Monto" value={quoteForm.amount}
-                    onChange={e => setQuoteForm(f => ({...f, amount: e.target.value}))}
-                    className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                </div>
-                <textarea value={quoteForm.description} onChange={e => setQuoteForm(f => ({...f, description: e.target.value}))}
-                  placeholder="Descripción del trabajo a realizar (opcional)..."
-                  className="w-full min-h-[70px] bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <div className="flex gap-2">
-                  <button onClick={() => setShowQuoteForm(false)} className="flex-1 h-10 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
-                    Cancelar
-                  </button>
-                  <button disabled={!quoteForm.amount || sendingQuote} onClick={async () => {
-                    if (!job.provider_id) return;
-                    setSendingQuote(true);
-                    await supabase.from("quotes").insert({
-                      job_id: id, provider_id: job.provider_id,
-                      amount: parseFloat(quoteForm.amount), description: quoteForm.description
-                    });
-                    await loadQuotes();
-                    setQuoteForm({ amount: "", description: "" });
-                    setShowQuoteForm(false);
-                    setSendingQuote(false);
-                  }} className="flex-1 h-10 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1">
-                    {sendingQuote && <Loader2 className="h-4 w-4 animate-spin" />} Enviar
-                  </button>
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => updateStatus("accepted")} className="h-12 bg-green-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
-                <CheckCircle2 className="h-5 w-5" /> Aceptar
-              </button>
-              <button onClick={() => updateStatus("cancelled")} className="h-12 bg-white border border-red-200 text-red-500 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
-                <XCircle className="h-5 w-5" /> Rechazar
-              </button>
+          {/* job chip */}
+          <div style={{ marginTop: 14, padding: "12px 14px", background: t.surfaceAlt, borderRadius: t.radiusSm, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: `${cat?.hue ?? t.green}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <CategoryIcon name={cat?.id ?? "gasista"} size={18} color={cat?.hue ?? t.green} />
             </div>
-          </div>
-        )}
-        {isProvider && job.status === "accepted" && (
-          <button onClick={() => updateStatus("in_progress")} className="h-12 bg-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors">
-            <Play className="h-5 w-5" /> Iniciar trabajo
-          </button>
-        )}
-        {isProvider && job.status === "in_progress" && (
-          <button onClick={() => updateStatus("completed")} className="h-12 bg-green-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors">
-            <CheckCircle2 className="h-5 w-5" /> Marcar como completado
-          </button>
-        )}
-        {isClient && job.status === "pending" && (
-          <button onClick={() => updateStatus("cancelled")} className="h-12 bg-white border border-red-200 text-red-500 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-red-50 transition-colors">
-            <XCircle className="h-5 w-5" /> Cancelar solicitud
-          </button>
-        )}
-
-        {/* Review */}
-        {isClient && job.status === "completed" && !hasReview && job.provider_id && (
-          <ReviewModal jobId={job.id} providerId={job.provider_id} onDone={() => setHasReview(true)} />
-        )}
-
-        {/* Cotizaciones */}
-        {quotes.length > 0 && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h3 className="font-semibold text-sm text-gray-900 mb-3 flex items-center gap-2">
-              <Tag className="h-4 w-4 text-green-600" /> Cotizaciones
-            </h3>
-            <div className="space-y-3">
-              {quotes.map((q: any) => (
-                <div key={q.id} className={`p-4 rounded-xl border ${
-                  q.status === "accepted" ? "bg-green-50 border-green-200" :
-                  q.status === "rejected" ? "bg-gray-50 border-gray-200" :
-                  "bg-amber-50 border-amber-200"
-                }`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <span className="text-lg font-bold text-green-700">${parseFloat(q.amount).toLocaleString()}</span>
-                      <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-lg ${
-                        q.status === "accepted" ? "bg-green-100 text-green-700" :
-                        q.status === "rejected" ? "bg-gray-100 text-gray-500" :
-                        "bg-amber-100 text-amber-700"
-                      }`}>
-                        {q.status === "accepted" ? "Aceptada" : q.status === "rejected" ? "Rechazada" : "Pendiente"}
-                      </span>
-                    </div>
-                  </div>
-                  {q.description && <p className="text-sm text-gray-600 mb-3">{q.description}</p>}
-                  {isClient && q.status === "pending" && (
-                    <div className="flex gap-2">
-                      <button onClick={async () => {
-                        await supabase.from("quotes").update({ status: "accepted" }).eq("id", q.id);
-                        await supabase.from("jobs").update({ price: q.amount, status: "accepted" }).eq("id", id);
-                        loadQuotes(); loadJob();
-                      }} className="flex-1 h-9 bg-green-600 text-white rounded-xl text-xs font-semibold hover:bg-green-700 transition-colors">
-                        Aceptar cotización
-                      </button>
-                      <button onClick={async () => {
-                        await supabase.from("quotes").update({ status: "rejected" }).eq("id", q.id);
-                        loadQuotes();
-                      }} className="flex-1 h-9 border border-red-200 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 transition-colors">
-                        Rechazar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: t.fontBody, fontSize: 13, fontWeight: 700, color: t.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{job.description}</div>
+              <div style={{ fontFamily: t.fontBody, fontSize: 11.5, color: t.inkMute }}>{job.address}</div>
             </div>
+            {job.price ? <span style={{ fontFamily: t.fontDisplay, fontSize: 16, fontWeight: 700, color: t.ink }}>{fmtARS(job.price)}</span> : null}
           </div>
-        )}
-
-        {/* Chat */}
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden flex flex-col">
-          <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
-            <h3 className="font-semibold text-sm text-gray-900">Mensajes</h3>
-            <span className="text-xs text-gray-400">{messages.length} mensaje{messages.length !== 1 ? "s" : ""}</span>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[280px] max-h-[400px] bg-gray-50/30">
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-40 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
-                  <Send className="h-5 w-5 text-gray-300" />
-                </div>
-                <p className="text-sm text-gray-400">Aun no hay mensajes</p>
-                <p className="text-xs text-gray-300 mt-1">Iniciá la conversacion</p>
-              </div>
-            )}
-            {messages.map((m, i) => {
-              const isMe = m.sender_id === user?.id;
-              const prevMsg = messages[i - 1];
-              const showName = !isMe && (!prevMsg || prevMsg.sender_id !== m.sender_id);
-              return (
-                <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[78%] ${isMe ? "" : "flex gap-2"}`}>
-                    {!isMe && (
-                      <div className={`h-7 w-7 rounded-xl bg-green-100 flex items-center justify-center text-xs font-bold text-green-700 shrink-0 mt-auto ${showName ? "" : "opacity-0"}`}>
-                        {otherInitial}
+          {/* stepper */}
+          {stepIdx >= 0 && (
+            <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 4 }}>
+              {["Aceptado", "En curso", "Finalizado", "Confirmado"].map((label, i, arr) => {
+                const done = stepIdx >= i, current = stepIdx === i;
+                return (
+                  <div key={label} style={{ display: "contents" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: "0 0 auto" }}>
+                      <div style={{ width: 22, height: 22, borderRadius: 999, background: done ? t.green : t.surface, border: `2px solid ${done ? t.green : t.line}`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: current ? `0 0 0 4px ${t.greenSoft}` : "none" }}>
+                        {done && stepIdx > i && <Icon name="check" size={11} color="#fff" stroke={3} />}
+                        {current && <div style={{ width: 7, height: 7, borderRadius: 999, background: "#fff" }} />}
                       </div>
-                    )}
-                    <div>
-                      {showName && !isMe && <p className="text-xs text-gray-400 mb-1 ml-1">{otherName}</p>}
-                      <div className={`px-4 py-2.5 rounded-2xl text-sm ${isMe
-                        ? "bg-green-600 text-white rounded-br-sm"
-                        : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"}`}>
-                        <p>{m.text}</p>
-                        <p className={`text-xs mt-1 ${isMe ? "text-green-200" : "text-gray-400"} text-right`}>
-                          {format(new Date(m.created_at), "HH:mm")}
-                        </p>
-                      </div>
+                      <span style={{ fontFamily: t.fontBody, fontSize: 9.5, fontWeight: current ? 700 : 500, color: done ? t.ink : t.inkSoft }}>{label}</span>
                     </div>
+                    {i < arr.length - 1 && <div style={{ flex: 1, height: 2, background: stepIdx > i ? t.green : t.line, marginBottom: 16, borderRadius: 2 }} />}
                   </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          {canChat ? (
-            <div className="p-3 border-t border-gray-100 flex gap-2 bg-white">
-              <input
-                className="flex-1 h-11 bg-gray-100 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all"
-                placeholder="Escribi un mensaje..."
-                value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
-              />
-              <button onClick={sendMessage} disabled={sending || !text.trim()}
-                className="h-11 w-11 bg-green-600 text-white rounded-xl flex items-center justify-center hover:bg-green-700 transition-colors disabled:opacity-40 shrink-0">
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
-            </div>
-          ) : (
-            <div className="p-3 border-t border-gray-100 bg-gray-50">
-              <p className="text-xs text-center text-gray-400">Este trabajo fue {job.status === "completed" ? "completado" : "cancelado"}</p>
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* tabs */}
+        <div style={{ display: "flex", background: t.surface, padding: "0 16px", borderBottom: `1px solid ${t.lineSoft}` }}>
+          {(["chat", "resumen"] as const).map(o => (
+            <button key={o} onClick={() => setTab(o)} style={{ all: "unset", cursor: "pointer", padding: "12px 16px", position: "relative", fontFamily: t.fontBody, fontSize: 14, fontWeight: tab === o ? 700 : 500, color: tab === o ? t.ink : t.inkMute }}>
+              {o === "chat" ? "Chat" : "Resumen"}
+              {tab === o && <div style={{ position: "absolute", left: 14, right: 14, bottom: 0, height: 2.5, background: t.ink, borderRadius: 3 }} />}
+            </button>
+          ))}
+        </div>
+
+        {tab === "chat" ? (
+          <>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {messages.length === 0 && <div style={{ textAlign: "center", padding: "40px 0", fontFamily: t.fontBody, color: t.inkSoft, fontSize: 13 }}>Aún no hay mensajes. Iniciá la conversación.</div>}
+              {messages.map(m => {
+                const mine = m.sender_id === user?.id;
+                return (
+                  <div key={m.id} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "78%", background: mine ? t.green : t.surface, color: mine ? "#fff" : t.ink, borderRadius: 18, borderTopRightRadius: mine ? 4 : 18, borderTopLeftRadius: mine ? 18 : 4, padding: "10px 14px", border: mine ? "none" : `1px solid ${t.lineSoft}` }}>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 14, lineHeight: 1.4 }}>{m.text}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 10, opacity: 0.55, marginTop: 4, textAlign: "right" }}>{format(new Date(m.created_at), "HH:mm")}</div>
+                  </div>
+                );
+              })}
+              {/* Cliente confirma trabajo terminado */}
+              {isClient && awaitingConfirmation && (
+                <div style={{ margin: "8px 0", padding: 16, background: "rgba(232,168,43,0.10)", border: "1px solid rgba(232,168,43,0.30)", borderRadius: t.radius, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="check-circle" size={20} color="#E8A82B" /><span style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 14, color: "#9B6B12" }}>El prestador marcó como finalizado</span></div>
+                  <div style={{ fontFamily: t.fontBody, fontSize: 13, color: "#9B6B12", lineHeight: 1.45 }}>Revisá el trabajo y confirmá para cerrarlo. Después vas a poder calificar.</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Button variant="outline" size="sm" onClick={() => toast("Usá el chat para resolver el inconveniente", "shield")}>Algo no está bien</Button>
+                    <Button variant="green" size="sm" onClick={confirmCompletion}>Confirmar</Button>
+                  </div>
+                </div>
+              )}
+              {isProvider && awaitingConfirmation && (
+                <div style={{ margin: "8px 0", padding: 14, background: "rgba(232,168,43,0.10)", border: "1px solid rgba(232,168,43,0.30)", borderRadius: t.radius, fontFamily: t.fontBody, fontSize: 13, color: "#9B6B12" }}>Esperando la confirmación del cliente para cerrar el trabajo.</div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            {canChat ? (
+              <div style={{ padding: "10px 14px 30px", background: t.surface, borderTop: `1px solid ${t.lineSoft}`, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ flex: 1, height: 44, background: t.surfaceAlt, borderRadius: 999, display: "flex", alignItems: "center", padding: "0 16px" }}>
+                  <input value={text} onChange={e => setText(e.target.value)} placeholder="Escribí un mensaje..." onKeyDown={e => e.key === "Enter" && sendMessage()}
+                    style={{ all: "unset", flex: 1, fontFamily: t.fontBody, fontSize: 14, color: t.ink }} />
+                </div>
+                <button onClick={sendMessage} disabled={sending || !text.trim()} style={{ all: "unset", cursor: "pointer", width: 44, height: 44, borderRadius: 999, background: t.green, display: "flex", alignItems: "center", justifyContent: "center", opacity: sending || !text.trim() ? 0.5 : 1 }}>
+                  <Icon name="send" size={18} color="#fff" />
+                </button>
+              </div>
+            ) : (
+              <div style={{ padding: "14px", background: t.surface, borderTop: `1px solid ${t.lineSoft}`, textAlign: "center", fontFamily: t.fontBody, fontSize: 12, color: t.inkMute }}>
+                Este trabajo fue {job.status === "completed" ? "completado" : "cancelado"}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* descripción */}
+            <div style={{ background: t.surfaceAlt, borderRadius: t.radiusSm, padding: 14, fontFamily: t.fontBody, fontSize: 13.5, color: t.ink, lineHeight: 1.5 }}>{job.description}</div>
+
+            {/* fotos del pedido */}
+            {job.photos && job.photos.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {job.photos.map(url => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer">
+                    <img src={url} alt="" style={{ width: "100%", height: 96, objectFit: "cover", borderRadius: 10, border: `1px solid ${t.lineSoft}`, display: "block" }} />
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* comisión */}
+            {job.price && job.price > 0 && job.status !== "cancelled" && <CommissionBreakdown amount={job.price} role={isProvider ? "provider" : "client"} />}
+
+            {/* pago */}
+            {(isClient || isProvider) && job.status !== "pending" && job.status !== "cancelled" && <PaymentSection job={job} isClient={isClient} onPaymentChange={loadJob} />}
+
+            {/* acciones prestador: pending → cotizar + aceptar/rechazar */}
+            {isProvider && job.status === "pending" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 14, color: t.ink }}>Enviar cotización</div>
+                  <Field label="Monto (ARS)" value={quoteForm.amount} onChange={(v: string) => setQuoteForm(f => ({ ...f, amount: v }))} placeholder="Ej: 28500" type="number" />
+                  <Field label="Descripción (opcional)" value={quoteForm.description} onChange={(v: string) => setQuoteForm(f => ({ ...f, description: v }))} placeholder="Qué incluye" />
+                  {parseFloat(quoteForm.amount) > 0 && (() => { const b = calculateCommission(parseFloat(quoteForm.amount), tiers); return <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute }}>Si la aceptan, cobrás <strong style={{ color: t.green }}>{fmtARS(b.providerNet)}</strong> (comisión {fmtARS(b.fee)})</div>; })()}
+                  <Button variant="green" full disabled={!quoteForm.amount || sendingQuote} onClick={sendQuote}>Enviar cotización</Button>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <Button variant="green" full onClick={() => updateStatus("accepted")}>Aceptar trabajo</Button>
+                  <Button variant="outline" full onClick={() => updateStatus("cancelled")}>Rechazar</Button>
+                </div>
+              </div>
+            )}
+            {isProvider && job.status === "accepted" && <Button variant="green" size="lg" full onClick={() => updateStatus("in_progress")} icon={<Icon name="briefcase" size={18} color="#fff" />}>Iniciar trabajo</Button>}
+            {isProvider && job.status === "in_progress" && !job.provider_completed_at && <Button variant="green" size="lg" full onClick={markProviderDone} icon={<Icon name="check" size={18} color="#fff" />}>Marcar como terminado</Button>}
+            {isClient && awaitingConfirmation && <Button variant="green" size="lg" full onClick={confirmCompletion} icon={<Icon name="check-circle" size={18} color="#fff" />}>Confirmar trabajo completado</Button>}
+            {isClient && job.status === "pending" && <Button variant="outline" size="lg" full onClick={() => updateStatus("cancelled")}>Cancelar solicitud</Button>}
+
+            {/* cotizaciones (cliente) */}
+            {quotes.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cotizaciones</div>
+                {quotes.map((q: any) => (
+                  <div key={q.id} style={{ background: t.surface, border: `1px solid ${q.status === "accepted" ? t.green : t.lineSoft}`, borderRadius: t.radius, padding: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontFamily: t.fontDisplay, fontSize: 20, fontWeight: 700, color: t.ink }}>{fmtARS(parseFloat(q.amount))}</span>
+                      <span style={{ fontFamily: t.fontBody, fontSize: 11, fontWeight: 700, color: q.status === "accepted" ? t.green : q.status === "rejected" ? t.inkSoft : "#9B6B12", textTransform: "uppercase" }}>{q.status === "accepted" ? "Aceptada" : q.status === "rejected" ? "Rechazada" : "Pendiente"}</span>
+                    </div>
+                    {q.description && <div style={{ fontFamily: t.fontBody, fontSize: 13, color: t.inkMute, marginTop: 6 }}>{q.description}</div>}
+                    {isClient && q.status === "pending" && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                        <Button variant="green" size="sm" full onClick={() => acceptQuote(q)}>Aceptar</Button>
+                        <Button variant="outline" size="sm" full onClick={() => rejectQuote(q)}>Rechazar</Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* reseña */}
+            {isClient && job.status === "completed" && !hasReview && job.provider_id && paymentApproved && (
+              <ReviewCard jobId={job.id} providerId={job.provider_id} onDone={() => setHasReview(true)} />
+            )}
+            {isClient && job.status === "completed" && !hasReview && !paymentApproved && (
+              <div style={{ background: "rgba(232,168,43,0.10)", border: "1px solid rgba(232,168,43,0.30)", borderRadius: t.radius, padding: 14, fontFamily: t.fontBody, fontSize: 12.5, color: "#9B6B12", lineHeight: 1.5 }}>
+                <strong>Reseña disponible tras el pago.</strong> Para calificar, el pago debe haberse hecho a través de ServiMarket. Así las reseñas provienen de trabajos reales.
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </MobileScreen>
   );
 }

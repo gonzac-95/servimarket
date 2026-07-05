@@ -17,7 +17,7 @@ export default function Favorites() {
       if (!user || favorites.length === 0) { setLoading(false); return; }
       const { data } = await supabase
         .from("providers")
-        .select("*, users(*)")
+        .select("*, users(id,name,avatar_url,city)")
         .in("id", favorites);
       setProviders(data ?? []);
       setLoading(false);

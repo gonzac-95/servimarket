@@ -1,241 +1,120 @@
-﻿import { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
-import { Job } from "../types";
-import { Plus, Search, LogOut, Settings, Bell, MapPin, Clock, ChevronRight, Star, Wrench, TrendingUp, Briefcase, X } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import type { Job } from "../types";
+import { initPush } from "../lib/push";
+import { useTheme, fmtARS } from "../lib/theme";
+import { categoryByDbName } from "../lib/categories";
+import { Button } from "../components/mobile/kit";
+import { Icon, CategoryIcon } from "../components/mobile/Icon";
+import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  pending:     { label: "Pendiente",   color: "bg-amber-50 text-amber-700 border-amber-200",   dot: "bg-amber-400" },
-  accepted:    { label: "Aceptado",    color: "bg-blue-50 text-blue-700 border-blue-200",      dot: "bg-blue-400" },
-  in_progress: { label: "En progreso", color: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-400" },
-  completed:   { label: "Completado",  color: "bg-green-50 text-green-700 border-green-200",   dot: "bg-green-500" },
-  cancelled:   { label: "Cancelado",   color: "bg-gray-50 text-gray-500 border-gray-200",      dot: "bg-gray-400" },
-};
-
-function JobCard({ job, isClient }: { job: Job; isClient: boolean }) {
-  const cfg = STATUS_CONFIG[job.status] ?? STATUS_CONFIG.pending;
-  const other = isClient ? job.providers?.users?.name ?? "Sin asignar" : (job as any).clients?.name ?? "Cliente";
-  return (
-    <Link to={`/jobs/${job.id}`}>
-      <div className="bg-white border border-gray-100 rounded-2xl p-5 card-hover cursor-pointer">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-green-50 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-lg border border-green-100">{job.category}</span>
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${cfg.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
-              </span>
-            </div>
-            <p className="font-semibold text-gray-900 truncate">{other}</p>
-            <p className="text-sm text-gray-400 line-clamp-1 mt-0.5">{job.description}</p>
-            <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
-              <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.address}</span>
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDistanceToNow(new Date(job.created_at), { locale: es, addSuffix: true })}</span>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {job.price && <span className="text-sm font-bold text-green-700">${job.price.toLocaleString()}</span>}
-            <ChevronRight className="h-4 w-4 text-gray-300" />
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
+function stateInfo(job: Job, t: ReturnType<typeof useTheme>) {
+  if (job.status === "in_progress" && job.provider_completed_at)
+    return { label: "Esperando confirmación", bg: "rgba(232,168,43,0.14)", fg: "#9B6B12" };
+  switch (job.status) {
+    case "accepted": return { label: "Aceptado", bg: t.greenSoft, fg: t.greenDeep };
+    case "in_progress": return { label: "En curso", bg: t.greenSoft, fg: t.greenDeep };
+    case "completed": return { label: "Completado", bg: t.surfaceAlt, fg: t.inkMute };
+    case "cancelled": return { label: "Cancelado", bg: t.surfaceAlt, fg: t.inkMute };
+    default: return { label: "Pendiente", bg: "rgba(43,143,224,0.10)", fg: "#1B5C97" };
+  }
 }
 
 export default function Dashboard() {
-  const { user, provider, signOut } = useAuth();
+  const t = useTheme();
+  const { user, provider } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"active"|"history">("active");
-  const [unread, setUnread] = useState(0);
-  const [showNotifs, setShowNotifs] = useState(false);
-  const [notifs, setNotifs] = useState<any[]>([]);
+  const [tab, setTab] = useState<"active" | "done">("active");
   const isClient = user?.role === "client";
 
-  const loadNotifs = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    setNotifs(data ?? []);
-    setUnread((data ?? []).filter((n: any) => !n.read).length);
-  }, [user]);
-
-  useEffect(() => {
-    loadNotifs();
-    const sub = supabase.channel(`notifs:${user?.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user?.id}` },
-        () => loadNotifs())
-      .subscribe();
-    return () => { supabase.removeChannel(sub); };
-  }, [user, loadNotifs]);
-
-  async function markAllRead() {
-    if (!user) return;
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id);
-    setUnread(0);
-    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
-  }
+  useEffect(() => { if (user?.id) initPush(user.id); }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
     async function load() {
-      let q = supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(*), providers(*, users(*))").order("created_at", { ascending: false });
+      let q = supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))").order("created_at", { ascending: false });
       if (isClient) q = q.eq("client_id", user!.id);
       else q = q.eq("provider_id", provider?.id ?? "");
       const { data } = await q;
-      setJobs(data ?? []);
+      setJobs((data as Job[]) ?? []);
       setLoading(false);
     }
     load();
   }, [user, provider, isClient]);
 
-  const active = jobs.filter(j => !["completed","cancelled"].includes(j.status));
-  const history = jobs.filter(j => ["completed","cancelled"].includes(j.status));
-  const displayed = activeTab === "active" ? active : history;
+  const active = jobs.filter(j => !["completed", "cancelled"].includes(j.status));
+  const done = jobs.filter(j => ["completed", "cancelled"].includes(j.status));
+  const list = tab === "active" ? active : done;
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-green-600 rounded-lg flex items-center justify-center"><Wrench className="h-3.5 w-3.5 text-white" /></div>
-            <span className="font-bold text-lg">ServiMarket</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="relative">
-              <button onClick={() => { setShowNotifs(!showNotifs); if (unread > 0) markAllRead(); }}
-                className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
-                <Bell className="h-5 w-5 text-gray-500" />
-                {unread > 0 && (
-                  <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </button>
-              {showNotifs && (
-                <div className="absolute right-0 top-12 w-80 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-                    <span className="font-semibold text-sm">Notificaciones</span>
-                    <button onClick={() => setShowNotifs(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                      <X className="h-4 w-4 text-gray-400" />
-                    </button>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifs.length === 0 ? (
-                      <div className="text-center py-8 text-gray-400 text-sm">Sin notificaciones</div>
-                    ) : notifs.map((n: any) => (
-                      <div key={n.id} className={`px-4 py-3 border-b border-gray-50 last:border-0 ${!n.read ? "bg-green-50/50" : ""}`}>
-                        <div className="flex items-start gap-2">
-                          {!n.read && <span className="w-2 h-2 bg-green-500 rounded-full mt-1.5 shrink-0" />}
-                          <div className={!n.read ? "" : "ml-4"}>
-                            <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
-                            <p className="text-xs text-gray-400 mt-1">{formatDistanceToNow(new Date(n.created_at), { locale: es, addSuffix: true })}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <button onClick={() => navigate("/settings")} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <Settings className="h-5 w-5 text-gray-500" />
-            </button>
-            <button onClick={async () => { await signOut(); navigate("/"); }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-              <LogOut className="h-5 w-5 text-gray-500" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <div className="mb-6">
-          <p className="text-sm text-gray-400 mb-0.5">Bienvenido de nuevo</p>
-          <h1 className="text-2xl font-bold text-gray-900">{user?.name} 👋</h1>
-        </div>
-
-        {!isClient && provider && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            {[
-              { icon: Briefcase, label: "Activos", value: active.length, color: "text-blue-600", bg: "bg-blue-50" },
-              { icon: TrendingUp, label: "Completados", value: history.filter(j=>j.status==="completed").length, color: "text-green-600", bg: "bg-green-50" },
-              { icon: Star, label: "Rating", value: provider.rating_avg.toFixed(1), color: "text-amber-600", bg: "bg-amber-50" },
-            ].map(s => (
-              <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 text-center">
-                <div className={`h-9 w-9 ${s.bg} rounded-xl flex items-center justify-center mx-auto mb-2`}>
-                  <s.icon className={`h-4 w-4 ${s.color}`} />
-                </div>
-                <div className="text-xl font-bold text-gray-900">{s.value}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isClient && provider && (!provider.bio || provider.categories.length === 0) && (
-          <div onClick={() => navigate("/settings")} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors mb-4">
-            <div className="h-10 w-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
-              <span className="text-xl">⚠️</span>
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm text-amber-800">Completá tu perfil</p>
-              <p className="text-xs text-amber-600">Los clientes no pueden encontrarte hasta que completes tu información</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-amber-400 shrink-0" />
-          </div>
-        )}
-
-        <div className="flex gap-3 mb-6">
-          {isClient && (
-            <button onClick={() => navigate("/jobs/new")} className="flex-1 bg-green-600 text-white rounded-2xl py-3.5 font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-sm shadow-green-200">
-              <Plus className="h-5 w-5" /> Nueva solicitud
-            </button>
-          )}
-          <button onClick={() => navigate("/search")} className={`${isClient ? "flex-1" : "w-full"} bg-white border border-gray-200 text-gray-700 rounded-2xl py-3.5 font-semibold flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors`}>
-            <Search className="h-5 w-5" /> Buscar prestadores
-          </button>
-          {isClient && (
-            <button onClick={() => navigate("/favorites")} className="bg-white border border-gray-200 text-gray-700 rounded-2xl py-3.5 px-4 flex items-center justify-center hover:bg-gray-50 transition-colors" title="Mis favoritos">
-              <Star className="h-5 w-5 text-amber-400" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex gap-1 bg-gray-100 rounded-2xl p-1 mb-5">
-          {(["active","history"] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${activeTab === tab ? "bg-white text-gray-900 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}>
-              {tab === "active" ? `Activos (${active.length})` : `Historial (${history.length})`}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-28 bg-gray-100 animate-pulse rounded-2xl" />)}</div>
-        ) : displayed.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><Briefcase className="h-7 w-7 text-gray-300" /></div>
-            <p className="font-semibold text-gray-500">{activeTab === "active" ? "No tenés trabajos activos" : "Sin historial aún"}</p>
-            {isClient && activeTab === "active" && (
-              <button onClick={() => navigate("/jobs/new")} className="mt-4 bg-green-600 text-white px-6 py-2.5 rounded-xl font-medium text-sm hover:bg-green-700 transition-colors">
-                Crear primera solicitud
+    <MobileScreen>
+      <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "54px 20px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 32, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em" }}>Mis trabajos</h1>
+            {isClient && (
+              <button onClick={() => navigate("/search")} style={{ all: "unset", cursor: "pointer", width: 42, height: 42, borderRadius: 999, background: t.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon name="plus" size={20} color="#fff" stroke={2.4} />
               </button>
             )}
           </div>
-        ) : (
-          <div className="space-y-3">{displayed.map(j => <JobCard key={j.id} job={j} isClient={isClient} />)}</div>
-        )}
+          <div style={{ marginTop: 16, display: "inline-flex", background: t.surfaceAlt, padding: 4, borderRadius: 999, gap: 4 }}>
+            {([{ id: "active", label: `Activos (${active.length})` }, { id: "done", label: `Terminados (${done.length})` }] as const).map(o => {
+              const on = tab === o.id;
+              return (
+                <button key={o.id} onClick={() => setTab(o.id)} style={{
+                  all: "unset", cursor: "pointer", padding: "8px 16px", borderRadius: 999,
+                  background: on ? t.surface : "transparent", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                  fontFamily: t.fontBody, fontWeight: 700, fontSize: 13, color: on ? t.ink : t.inkMute,
+                }}>{o.label}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 20px 100px", display: "flex", flexDirection: "column", gap: 12 }}>
+          {loading ? (
+            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div>
+          ) : list.length === 0 ? (
+            <div style={{ padding: "70px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
+              <div style={{ fontSize: 40 }}>📭</div>
+              <div style={{ marginTop: 8 }}>No hay trabajos {tab === "active" ? "activos" : "terminados"} todavía.</div>
+              {isClient && <div style={{ marginTop: 20 }}><Button variant="green" onClick={() => navigate("/search")}>Buscar un prestador</Button></div>}
+            </div>
+          ) : list.map(j => {
+            const other = isClient ? (j.providers?.users?.name ?? "Sin asignar") : ((j as any).clients?.name ?? "Cliente");
+            const cat = categoryByDbName(j.category);
+            const st = stateInfo(j, t);
+            return (
+              <button key={j.id} onClick={() => navigate(`/jobs/${j.id}`)} style={{
+                all: "unset", cursor: "pointer", display: "block", background: t.surface,
+                border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, padding: 16, boxShadow: t.shadow, boxSizing: "border-box",
+              }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: `${cat?.hue ?? t.green}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <CategoryIcon name={cat?.id ?? "gasista"} size={20} color={cat?.hue ?? t.green} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 11, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{cat?.label ?? j.category}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700, color: t.ink, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{j.description}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 12.5, color: t.inkMute, marginTop: 4 }}>{isClient ? "con" : "de"} {other}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px dashed ${t.line}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ padding: "5px 10px", background: st.bg, color: st.fg, borderRadius: 999, fontFamily: t.fontBody, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase" }}>{st.label}</span>
+                  {j.price ? <span style={{ fontFamily: t.fontDisplay, fontSize: 18, fontWeight: 700, color: t.ink, letterSpacing: "-0.01em" }}>{fmtARS(j.price)}</span> : <span style={{ fontFamily: t.fontBody, fontSize: 12.5, color: t.inkSoft }}>Sin cotizar</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <TabBar active="jobs" role={isClient ? "client" : "provider"} />
       </div>
-    </div>
+    </MobileScreen>
   );
 }

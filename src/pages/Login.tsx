@@ -1,95 +1,87 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { useAuth } from "../lib/auth";
-import { useToast } from "../components/ui/use-toast";
-import { Loader2 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useTheme } from "../lib/theme";
+import { Button, Field, GoogleG, toast } from "../components/mobile/kit";
+import { Icon } from "../components/mobile/Icon";
+import { OAUTH_CALLBACK } from "../components/NativeBridge";
 
 export default function Login() {
+  const t = useTheme();
   const { signIn } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = searchParams.get("redirect") ?? "/home";
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "" });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleLogin() {
+    if (loading) return;
     setLoading(true);
-    const { error } = await signIn(form.email, form.password);
+    const { error } = await signIn(email.trim(), pass);
     setLoading(false);
-    if (error) toast({ title: "Email o contraseña incorrectos.", variant: "destructive" });
-    else navigate(redirect);
+    if (error) { toast("Email o contraseña incorrectos", "close"); return; }
+    navigate(redirect, { replace: true });
   }
 
   async function handleGoogle() {
-    setLoadingGoogle(true);
-    const { error } = await supabase.auth.signInWithOAuth({
+    const isNative = Capacitor.isNativePlatform();
+    // En la app nativa el OAuth se abre en el navegador del sistema (Google
+    // bloquea webviews) y vuelve por deep link, que procesa NativeBridge.
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: isNative ? OAUTH_CALLBACK : `${window.location.origin}/dashboard`,
+        skipBrowserRedirect: isNative,
       },
     });
-    if (error) {
-      toast({ title: "Error al iniciar con Google", variant: "destructive" });
-      setLoadingGoogle(false);
-    }
+    if (error) { toast("Error al iniciar con Google", "close"); return; }
+    if (isNative && data?.url) await Browser.open({ url: data.url });
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl border shadow-sm p-8">
-        <div className="text-center mb-6">
-          <Link to="/" className="font-bold text-2xl text-gradient">ServiMarket</Link>
-          <p className="text-gray-500 mt-1 text-sm">Ingresá con tu cuenta</p>
-        </div>
-
-        {/* Google */}
-        <button onClick={handleGoogle} disabled={loadingGoogle}
-          className="w-full h-11 flex items-center justify-center gap-3 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 mb-4">
-          {loadingGoogle ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-            <svg width="18" height="18" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-          )}
-          Continuar con Google
+    <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ padding: "54px 20px 0" }}>
+        <button onClick={() => navigate("/")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name="arrow-left" size={20} color={t.ink} />
         </button>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-gray-100" />
-          <span className="text-xs text-gray-400">o con email</span>
-          <div className="flex-1 h-px bg-gray-100" />
+      </div>
+      <div style={{ padding: "36px 24px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 38, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em", lineHeight: 1.05 }}>
+            Bienvenido<br />de vuelta
+          </h1>
+          <div style={{ width: 60, height: 60, flexShrink: 0, borderRadius: 15, background: `linear-gradient(135deg, ${t.greenBright}, ${t.greenDeep})`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 20px -8px rgba(14,92,44,0.4)" }}>
+            <svg width="38" height="38" viewBox="0 0 120 120" fill="none">
+              <path d="M 22 56 L 60 22 L 98 56 L 98 94 a4 4 0 0 1 -4 4 L 26 98 a4 4 0 0 1 -4 -4 Z" fill="none" stroke="#fff" strokeWidth="5" strokeLinejoin="round" />
+              <path d="M 76 50 Q 76 44 70 44 L 52 44 Q 44 44 44 52 Q 44 60 52 62 L 68 64 Q 78 66 78 74 Q 78 82 70 82 L 42 82" fill="none" stroke="#fff" strokeWidth="8.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium block mb-1">Email</label>
-            <input type="email" placeholder="tu@email.com" value={form.email}
-              onChange={e => setForm(f => ({...f, email: e.target.value}))} required
-              className="w-full h-10 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Contraseña</label>
-            <input type="password" placeholder="••••••••" value={form.password}
-              onChange={e => setForm(f => ({...f, password: e.target.value}))} required
-              className="w-full h-10 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </div>
-          <button type="submit" disabled={loading}
-            className="w-full h-10 bg-green-600 text-white rounded-lg font-medium text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />} Ingresar
-          </button>
-        </form>
-
-        <p className="mt-4 text-center text-sm text-gray-500">
-          ¿No tenés cuenta?{" "}
-          <Link to="/register" className="text-green-600 font-medium hover:underline">Registrate gratis</Link>
-        </p>
+        <p style={{ marginTop: 10, fontFamily: t.fontBody, fontSize: 15, color: t.inkMute }}>Ingresá con tu correo y contraseña.</p>
+      </div>
+      <div style={{ padding: "32px 24px 0", flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+        <Field label="Correo electrónico" value={email} onChange={setEmail} type="email" placeholder="vos@ejemplo.com" onEnter={handleLogin} />
+        <Field label="Contraseña" value={pass} onChange={setPass} type={showPass ? "text" : "password"} placeholder="Tu contraseña" onEnter={handleLogin}
+          right={<button onClick={() => setShowPass(s => !s)} style={{ all: "unset", cursor: "pointer", display: "flex", padding: 6 }}><Icon name="eye" size={18} color={t.inkSoft} /></button>} />
+        <div style={{ textAlign: "right" }}>
+          <button onClick={() => navigate("/forgot-password")} style={{ all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 600, color: t.green }}>¿Olvidaste tu contraseña?</button>
+        </div>
+      </div>
+      <div style={{ padding: "0 24px 30px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <Button variant="green" size="lg" full onClick={handleLogin} disabled={loading}>{loading ? "Ingresando..." : "Ingresar"}</Button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: t.inkSoft, fontFamily: t.fontBody, fontSize: 12 }}>
+          <div style={{ flex: 1, height: 1, background: t.line }} /><span>o continuá con</span><div style={{ flex: 1, height: 1, background: t.line }} />
+        </div>
+        <Button variant="outline" size="md" full icon={<GoogleG />} onClick={handleGoogle}>Continuar con Google</Button>
+        <div style={{ textAlign: "center", fontFamily: t.fontBody, fontSize: 14, color: t.inkMute }}>
+          ¿Sos nuevo? <button onClick={() => navigate("/register")} style={{ all: "unset", cursor: "pointer", color: t.green, fontWeight: 700 }}>Crear cuenta</button>
+        </div>
       </div>
     </div>
   );

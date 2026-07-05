@@ -1,179 +1,231 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
-import { ArrowLeft, Star, MapPin, CheckCircle2, Loader2, MessageSquare, DollarSign, Clock, Heart } from "lucide-react";
 import { useFavorites } from "../hooks/useFavorites";
+import { useTheme, shade, fmtARS } from "../lib/theme";
+import { categoryByDbName } from "../lib/categories";
+import { Avatar, Button, Tag, TopBar, toast } from "../components/mobile/kit";
+import { Icon } from "../components/mobile/Icon";
+import { MobileScreen } from "../components/mobile/MobileScreen";
+
+function Stat({ label, value, sub, icon }: { label: string; value: string | number; sub: string; icon?: string }) {
+  const t = useTheme();
+  return (
+    <div style={{ padding: "12px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: t.radiusSm }}>
+      <div style={{ fontFamily: t.fontBody, fontSize: 10.5, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+        {icon && <Icon name={icon} size={16} color={t.star} />}
+        <span style={{ fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1 }}>{value}</span>
+      </div>
+      <div style={{ fontFamily: t.fontBody, fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 4 }}>{sub}</div>
+    </div>
+  );
+}
+
+function InfoRow({ icon, label, value, last }: { icon: string; label: string; value: string; last?: boolean }) {
+  const t = useTheme();
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderBottom: last ? "none" : `1px solid ${t.lineSoft}` }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: t.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon name={icon} size={16} color={t.inkMute} />
+      </div>
+      <div style={{ flex: 1, fontFamily: t.fontBody, fontSize: 13, color: t.inkMute }}>{label}</div>
+      <div style={{ fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 600, color: t.ink }}>{value}</div>
+    </div>
+  );
+}
 
 export default function ProviderProfile() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const t = useTheme();
   const [provider, setProvider] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"about" | "reviews" | "work">("about");
   const { isFavorite, toggleFavorite } = useFavorites();
 
   useEffect(() => {
     async function load() {
-      const { data: p } = await supabase.from("providers").select("*, users(*)").eq("id", id).single();
+      const { data: p } = await supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("id", id).single();
       setProvider(p);
-      const { data: r } = await supabase.from("reviews").select("*, clients:users!reviews_client_id_fkey(*)").eq("provider_id", id).order("created_at", { ascending: false }).limit(20);
+      const { data: r } = await supabase.from("reviews").select("*, clients:users!reviews_client_id_fkey(id,name,avatar_url)").eq("provider_id", id).order("created_at", { ascending: false }).limit(20);
       setReviews(r ?? []);
       setLoading(false);
     }
     load();
   }, [id]);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-    </div>
-  );
-  if (!provider) return <div className="text-center py-24 text-gray-400">Prestador no encontrado</div>;
+  if (loading) return <MobileScreen><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div></MobileScreen>;
+  if (!provider) return <MobileScreen><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>Prestador no encontrado</div></MobileScreen>;
 
   const u = provider.users;
-  const initials = u?.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0,2);
+  const name = u?.name ?? "Prestador";
+  const initials = name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+  const hue = (provider.categories?.[0] && categoryByDbName(provider.categories[0])?.hue) || t.green;
+  const catLabel = provider.categories?.[0] ? (categoryByDbName(provider.categories[0])?.label ?? provider.categories[0]) : "Servicio";
+  const isNew = (provider.reviews_count ?? 0) === 0;
+  const fav = isFavorite(provider.id);
+  const photos: string[] = provider.photos ?? [];
+  const prices = provider.price_list ?? [];
+
+  // distribución de estrellas
+  const dist = [5, 4, 3, 2, 1].map(n => {
+    const c = reviews.filter(r => r.rating === n).length;
+    return { n, pct: reviews.length ? Math.round((c / reviews.length) * 100) : 0 };
+  });
+
+  function requestQuote() {
+    if (user?.role !== "client") { toast("Iniciá sesión como cliente para pedir presupuesto", "close"); return; }
+    navigate(`/jobs/new?provider=${id}`);
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 flex items-center gap-3 h-16">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-          <span className="font-semibold text-gray-900">Perfil del prestador</span>
-        </div>
-      </header>
-
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {/* Profile card */}
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-          <div className="bg-gradient-to-br from-green-800 to-green-700 px-6 pt-8 pb-16 relative">
-            <div className="absolute inset-0 opacity-10" style={{backgroundImage: "radial-gradient(circle at 2px 2px, white 1px, transparent 0)", backgroundSize: "24px 24px"}} />
-          </div>
-          <div className="px-6 pb-6 -mt-10 relative">
-            <div className="flex items-end justify-between mb-4">
-              <div className="h-20 w-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center text-2xl font-bold text-green-700">
-                {u?.avatar_url ? <img src={u.avatar_url} alt="" className="h-full w-full rounded-xl object-cover" /> : initials}
+    <MobileScreen>
+      <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
+        {/* hero */}
+        <div style={{ background: t.surfaceDeep, padding: "54px 16px 28px", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", right: -60, top: -40, width: 220, height: 220, borderRadius: 999, background: `radial-gradient(circle, ${shade(hue, 10)}55, transparent 70%)` }} />
+          <TopBar title="" onBack={() => navigate(-1)} transparent dark right={
+            <button onClick={() => { toggleFavorite(provider.id); toast(fav ? "Quitado de favoritos" : "Guardado en favoritos", "heart-fill"); }} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name={fav ? "heart-fill" : "heart"} size={18} color={fav ? "#FF5A5A" : "#fff"} />
+            </button>
+          } />
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginTop: 12, position: "relative" }}>
+            <Avatar initials={initials} hue={hue} size={84} ring src={u?.avatar_url} />
+            <div style={{ flex: 1, color: "#fff", paddingBottom: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em", lineHeight: 1.1 }}>{name}</h1>
+                {provider.documents_verified && <Icon name="check-circle" size={18} color={t.greenBright} />}
               </div>
-              <div className="flex items-center gap-2">
-                {provider.is_available
-                  ? <span className="bg-green-50 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-xl border border-green-100 flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-green-500 rounded-full" />Disponible</span>
-                  : <span className="bg-gray-50 text-gray-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-100">No disponible</span>}
-                {user && user.role === "client" && (
-                  <button onClick={() => toggleFavorite(provider.id)}
-                    className={`p-2 rounded-xl border transition-all ${isFavorite(provider.id) ? "bg-red-50 border-red-200 text-red-500" : "bg-white border-gray-200 text-gray-400 hover:border-red-200 hover:text-red-400"}`}>
-                    <Heart className={`h-4 w-4 ${isFavorite(provider.id) ? "fill-red-500" : ""}`} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">{u?.name}</h1>
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {provider.categories.map((c: string) => (
-                <span key={c} className="bg-green-50 text-green-700 text-sm font-medium px-3 py-1 rounded-xl border border-green-100">{c}</span>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
-              {provider.reviews_count > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span className="font-semibold text-gray-900">{provider.rating_avg.toFixed(1)}</span>
-                  <span>({provider.reviews_count} Reseñas)</span>
-                </div>
-              )}
-              <div className="flex items-center gap-1"><MapPin className="h-4 w-4" />{provider.service_radius_km} km de radio</div>
-              {provider.documents_verified && (
-                <div className="flex items-center gap-1 text-emerald-600 font-medium">
-                  <CheckCircle2 className="h-4 w-4" />Verificado
-                </div>
-              )}
+              <div style={{ fontFamily: t.fontBody, fontSize: 13.5, opacity: 0.7, marginTop: 4 }}>{catLabel}</div>
             </div>
           </div>
-        </div>
-
-        {/* CTA */}
-        {user?.role === "client" && (
-          <button onClick={() => navigate(`/jobs/new?provider=${id}`)}
-            className="w-full bg-green-600 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-sm shadow-green-200">
-            <MessageSquare className="h-5 w-5" />
-            Contratar a {u?.name?.split(" ")[0]}
-          </button>
-        )}
-
-        {/* Bio */}
-        {provider.bio && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-2">Sobre mí</h2>
-            <p className="text-gray-500 text-sm leading-relaxed">{provider.bio}</p>
-          </div>
-        )}
-
-        {/* Prices */}
-        {provider.price_list?.length > 0 && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-green-600" />Lista de precios
-            </h2>
-            <div className="space-y-1">
-              {provider.price_list.map((item: any, i: number) => (
-                <div key={i} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
-                  <span className="text-sm text-gray-700">{item.service}</span>
-                  <span className={`text-sm font-bold ${item.price === 0 ? "text-gray-400" : "text-green-700"}`}>
-                    {item.price === 0 ? "A presupuestar" : `$${item.price.toLocaleString()} / ${item.unit}`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Reviews */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-5">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Star className="h-4 w-4 text-amber-400" />
-            Reseñas {provider.reviews_count > 0 && <span className="text-gray-400 font-normal">({provider.reviews_count})</span>}
-          </h2>
-          {reviews.length === 0 ? (
-            <div className="text-center py-8">
-              <Star className="h-8 w-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Sin Reseñas todavía</p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {reviews.map((r: any) => (
-                <div key={r.id} className="border-b border-gray-50 last:border-0 pb-5 last:pb-0">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="h-7 w-7 bg-green-100 rounded-lg flex items-center justify-center text-xs font-bold text-green-700">
-                          {r.clients?.name?.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-medium text-sm text-gray-900">{r.clients?.name}</span>
-                      </div>
-                      <div className="flex gap-0.5">
-                        {[1,2,3,4,5].map(i => <Star key={i} className={`h-3.5 w-3.5 ${i<=r.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"}`} />)}
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />{new Date(r.created_at).toLocaleDateString("es-AR")}
-                    </span>
-                  </div>
-                  {r.comment && <p className="text-sm text-gray-500 mt-2 leading-relaxed">{r.comment}</p>}
-                  {r.reply && (
-                    <div className="mt-3 pl-3 border-l-2 border-green-200 bg-green-50/50 rounded-r-xl py-2 pr-3">
-                      <p className="text-xs font-semibold text-green-700 mb-1">Respuesta del prestador</p>
-                      <p className="text-sm text-gray-600">{r.reply}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
+          {isNew && (
+            <div style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: t.greenBright, borderRadius: 999, fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: "#fff" }}>
+              <Icon name="badge" size={14} color="#fff" /> Nuevo en ServiMarket
             </div>
           )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginTop: 22 }}>
+            <Stat label="Rating" value={isNew ? "—" : provider.rating_avg.toFixed(1)} sub={`${provider.reviews_count} reseñas`} icon={isNew ? undefined : "star"} />
+            <Stat label="Verificado" value={provider.documents_verified ? "Sí" : "No"} sub="documentos" />
+            <Stat label="Zona" value={`${provider.service_radius_km}`} sub="km de radio" />
+          </div>
+        </div>
+
+        {/* tabs */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${t.lineSoft}`, padding: "0 20px", background: t.bg }}>
+          {([{ id: "about", label: "Sobre" }, { id: "reviews", label: "Reseñas" }, { id: "work", label: "Trabajos" }] as const).map(o => (
+            <button key={o.id} onClick={() => setTab(o.id)} style={{ all: "unset", cursor: "pointer", padding: "14px 16px", position: "relative", fontFamily: t.fontBody, fontSize: 14, fontWeight: tab === o.id ? 700 : 500, color: tab === o.id ? t.ink : t.inkMute }}>
+              {o.label}
+              {tab === o.id && <div style={{ position: "absolute", left: 14, right: 14, bottom: 0, height: 2.5, background: t.ink, borderRadius: 3 }} />}
+            </button>
+          ))}
+        </div>
+
+        {/* contenido */}
+        <div style={{ flex: 1, overflowY: "auto", paddingBottom: 110 }}>
+          {tab === "about" && (
+            <div style={{ padding: "20px 20px 24px" }}>
+              {provider.bio && <p style={{ margin: 0, fontFamily: t.fontBody, fontSize: 14.5, color: t.ink, lineHeight: 1.55 }}>{provider.bio}</p>}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 14 }}>
+                {(provider.categories ?? []).map((c: string) => <Tag key={c} tone="green">{categoryByDbName(c)?.label ?? c}</Tag>)}
+              </div>
+              {prices.length > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Lista de precios</div>
+                  <div style={{ background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, overflow: "hidden" }}>
+                    {prices.map((item: any, i: number) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 16px", borderBottom: i < prices.length - 1 ? `1px solid ${t.lineSoft}` : "none" }}>
+                        <span style={{ fontFamily: t.fontBody, fontSize: 14, color: t.ink }}>{item.service}</span>
+                        <span style={{ fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 700, color: item.price === 0 ? t.inkSoft : t.green }}>{item.price === 0 ? "A presupuestar" : `${fmtARS(item.price)} / ${item.unit}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Información</div>
+                <div style={{ background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, overflow: "hidden" }}>
+                  <InfoRow icon="pin" label="Zona" value={u?.city ? `${u.city}` : "Argentina"} />
+                  <InfoRow icon="shield" label="Radio de servicio" value={`${provider.service_radius_km} km`} />
+                  <InfoRow icon="calendar" label="Disponibilidad" value={provider.is_available ? "Disponible" : "No disponible"} last />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === "reviews" && (
+            <div style={{ padding: "20px 20px 24px" }}>
+              {isNew ? (
+                <div style={{ padding: "50px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
+                  <Icon name="star-outline" size={36} color={t.line} />
+                  <div style={{ marginTop: 10 }}>Todavía no tiene reseñas.</div>
+                </div>
+              ) : <>
+                <div style={{ display: "flex", gap: 20, padding: "18px", background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius }}>
+                  <div>
+                    <div style={{ fontFamily: t.fontDisplay, fontSize: 44, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em", lineHeight: 1 }}>{provider.rating_avg.toFixed(1)}</div>
+                    <div style={{ display: "flex", gap: 1, marginTop: 6 }}>{[1, 2, 3, 4, 5].map(n => <Icon key={n} name="star" size={14} color={n <= Math.round(provider.rating_avg) ? t.star : t.line} />)}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 11.5, color: t.inkMute, marginTop: 6 }}>{provider.reviews_count} reseñas</div>
+                  </div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, justifyContent: "center" }}>
+                    {dist.map(r => (
+                      <div key={r.n} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontFamily: t.fontBody, fontSize: 11, color: t.inkMute, width: 8 }}>{r.n}</span>
+                        <div style={{ flex: 1, height: 6, background: t.surfaceAlt, borderRadius: 99 }}><div style={{ height: "100%", width: `${r.pct}%`, background: t.green, borderRadius: 99 }} /></div>
+                        <span style={{ fontFamily: t.fontMono, fontSize: 10.5, color: t.inkSoft, width: 30, textAlign: "right" }}>{r.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
+                  {reviews.map(r => (
+                    <div key={r.id} style={{ padding: 16, background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Avatar initials={(r.clients?.name ?? "?").charAt(0).toUpperCase()} hue={t.inkMute} size={34} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 13.5, color: t.ink }}>{r.clients?.name ?? "Cliente"}</div>
+                          <div style={{ fontFamily: t.fontBody, fontSize: 11.5, color: t.inkSoft }}>{new Date(r.created_at).toLocaleDateString("es-AR")}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 1 }}>{[1, 2, 3, 4, 5].map(n => <Icon key={n} name="star" size={12} color={n <= r.rating ? t.star : t.line} />)}</div>
+                      </div>
+                      {r.comment && <p style={{ margin: "10px 0 0", fontFamily: t.fontBody, fontSize: 13.5, color: t.ink, lineHeight: 1.5 }}>{r.comment}</p>}
+                      {r.reply && (
+                        <div style={{ marginTop: 10, paddingLeft: 12, borderLeft: `2px solid ${t.greenSoft}` }}>
+                          <div style={{ fontFamily: t.fontBody, fontSize: 11.5, fontWeight: 700, color: t.green, marginBottom: 2 }}>Respuesta del prestador</div>
+                          <p style={{ margin: 0, fontFamily: t.fontBody, fontSize: 13, color: t.inkMute }}>{r.reply}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>}
+            </div>
+          )}
+
+          {tab === "work" && (
+            photos.length > 0 ? (
+              <div style={{ padding: "20px 20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {photos.map((url, i) => <img key={i} src={url} alt="" style={{ width: "100%", height: 130, objectFit: "cover", borderRadius: t.radiusSm }} />)}
+              </div>
+            ) : (
+              <div style={{ padding: "50px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
+                <Icon name="image" size={36} color={t.line} />
+                <div style={{ marginTop: 10 }}>Todavía no subió fotos de trabajos.</div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* action bar */}
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 20px 30px", background: t.surface, borderTop: `1px solid ${t.lineSoft}`, display: "flex", gap: 10, boxShadow: "0 -8px 30px rgba(0,0,0,0.04)" }}>
+          <Button variant="outline" size="lg" onClick={requestQuote} icon={<Icon name="chat" size={18} color={t.ink} />}>Chatear</Button>
+          <Button variant="green" size="lg" full onClick={requestQuote} icon={<Icon name="plus" size={18} color="#fff" stroke={2.4} />}>Pedir presupuesto</Button>
         </div>
       </div>
-    </div>
+    </MobileScreen>
   );
 }

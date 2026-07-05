@@ -1,6 +1,6 @@
 # ServiMarket 🔧
 
-Marketplace de servicios del hogar para Argentina. Conecta clientes con prestadores (gasistas, electricistas, plomeros, fletes, y más).
+Marketplace de servicios del hogar para Argentina. Conecta clientes con prestadores (gasistas, electricistas, plomeros, fletes, pintores, y más).
 
 ---
 
@@ -9,10 +9,13 @@ Marketplace de servicios del hogar para Argentina. Conecta clientes con prestado
 | Capa | Tecnología |
 |------|-----------|
 | Frontend | React 18 + TypeScript + Vite |
-| UI | Tailwind CSS + shadcn/ui |
-| Backend / DB | Supabase (PostgreSQL + Auth + Realtime + Storage) |
-| Pagos | MercadoPago Sandbox (+ Stripe como fallback) |
-| Mobile | Capacitor (iOS + Android) |
+| UI | Tailwind CSS + shadcn/ui (Radix) + lucide-react |
+| Backend / DB | Supabase (PostgreSQL + Auth + Realtime + Storage + Edge Functions) |
+| Pagos | MercadoPago (Checkout Pro + OAuth Marketplace) |
+| Publicidad | Google AdMob (`@capacitor-community/admob`) |
+| Push | Firebase Cloud Messaging (`@capacitor/push-notifications`) |
+| Mobile | Capacitor 6 (iOS + Android) |
+| Deploy web | Vercel |
 
 ---
 
@@ -22,31 +25,48 @@ Marketplace de servicios del hogar para Argentina. Conecta clientes con prestado
 servimarket/
 ├── src/
 │   ├── lib/
-│   │   ├── supabase.ts       # Cliente Supabase
-│   │   └── auth.tsx          # Context de autenticación
+│   │   ├── supabase.ts        # Cliente Supabase + helpers de storage
+│   │   ├── auth.tsx           # Context de auth (incluye reset password)
+│   │   ├── commission.ts      # Cálculo de comisión por tramos (frontend)
+│   │   ├── mp-oauth.ts        # Helpers OAuth MercadoPago (conectar/desconectar)
+│   │   ├── ads.ts             # AdMob: init + banners (no-op en web)
+│   │   └── push.ts            # Push notifications nativas (no-op en web)
+│   ├── components/
+│   │   ├── ui/                # Componentes shadcn
+│   │   ├── AdBanner.tsx       # Banner de AdMob reutilizable
+│   │   └── LegalLayout.tsx    # Layout para páginas legales
 │   ├── pages/
-│   │   ├── Index.tsx         # Landing page
-│   │   ├── Login.tsx
-│   │   ├── Register.tsx
-│   │   ├── Search.tsx        # Búsqueda de prestadores
+│   │   ├── Index.tsx          # Landing
+│   │   ├── Login.tsx          # + link "¿Olvidaste tu contraseña?"
+│   │   ├── Register.tsx       # + checkbox de aceptación de términos
+│   │   ├── ForgotPassword.tsx # Solicitar reset de contraseña
+│   │   ├── ResetPassword.tsx  # Crear nueva contraseña
+│   │   ├── Search.tsx         # Búsqueda + filtro por calificación
 │   │   ├── ProviderProfile.tsx
-│   │   ├── JobCreate.tsx     # Crear solicitud
-│   │   ├── JobDetail.tsx     # Chat + estado del trabajo
-│   │   ├── Dashboard.tsx     # Panel cliente/prestador
-│   │   ├── Settings.tsx
-│   │   └── Admin.tsx         # Panel de administración
-│   ├── types/
-│   │   └── index.ts          # TypeScript types
-│   ├── App.tsx               # Router principal
-│   ├── main.tsx
-│   └── index.css
+│   │   ├── JobCreate.tsx      # Crear solicitud
+│   │   ├── JobDetail.tsx      # Chat + estado + pago + doble confirmación + reseña
+│   │   ├── Dashboard.tsx      # Panel cliente/prestador + campana de notificaciones
+│   │   ├── Settings.tsx       # Perfil + avatar + (conexión MP, oculta)
+│   │   ├── Favorites.tsx
+│   │   ├── PrivacyPolicy.tsx  # Política de privacidad
+│   │   ├── Terms.tsx          # Términos y condiciones
+│   │   └── Admin.tsx          # Admin: usuarios, prestadores, trabajos, comisiones
+│   ├── types/index.ts
+│   ├── App.tsx
+│   └── main.tsx
 ├── supabase/
-│   ├── schema.sql            # Base de datos + RLS + triggers
-│   ├── seed.sql              # Datos de prueba
+│   ├── migrations/            # Migraciones incrementales (ver orden abajo)
 │   └── functions/
-│       ├── create-payment/   # Edge Function: crear preferencia MP
-│       └── mp-webhook/       # Edge Function: webhook MercadoPago
+│       ├── _shared/           # commission.ts, state.ts (HMAC)
+│       ├── create-payment/    # Crea preferencia MP + comisión
+│       ├── mp-webhook/        # Webhook de pagos MP
+│       ├── mp-oauth-start/    # Inicia OAuth del prestador
+│       ├── mp-oauth-callback/ # Recibe el code y guarda tokens
+│       ├── mp-oauth-disconnect/
+│       └── send-push/         # Envía push vía FCM HTTP v1
+├── schema.sql                 # Schema consolidado (referencia)
 ├── capacitor.config.ts
+├── vite.config.ts             # Excluye plugins nativos del bundle web
 ├── .env.example
 └── package.json
 ```
@@ -55,217 +75,202 @@ servimarket/
 
 ## 🚀 Inicio rápido
 
-### 1. Clonar e instalar dependencias
-
 ```bash
-git clone https://github.com/tu-usuario/servimarket.git
-cd servimarket
 npm install
+cp .env.example .env   # completar con tus keys de Supabase
+npm run dev            # → http://localhost:5173
 ```
 
-### 2. Crear proyecto en Supabase
+### Variables de entorno (`.env`)
 
-1. Andá a [supabase.com](https://supabase.com) → New Project
-2. Copiá tu **Project URL** y **anon public key** desde Settings > API
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+# AdMob (opcional, sólo producción mobile)
+VITE_ADMOB_BANNER_ANDROID=ca-app-pub-XXXX/YYYY
+VITE_ADMOB_BANNER_IOS=ca-app-pub-XXXX/YYYY
+VITE_ADMOB_USE_REAL=false   # true para usar IDs reales en vez de test
+```
 
-### 3. Configurar variables de entorno
+---
+
+## 🗄 Base de datos
+
+Ejecutar en el **SQL Editor** de Supabase en este orden:
+
+1. `schema.sql` — tablas base, RLS, triggers, datos iniciales
+2. `supabase/migrations/20260508_commission_tiers.sql` — comisión escalonada + `app_config`
+3. `supabase/migrations/20260510_provider_mp_oauth.sql` — credenciales OAuth del prestador
+4. `supabase/migrations/20260522_job_double_confirmation.sql` — confirmación de trabajo
+5. `supabase/migrations/20260522_avatars_storage_policies.sql` — políticas del bucket `avatars`
+6. `supabase/migrations/20260522_notifications_triggers.sql` — notificaciones automáticas + push tokens
+
+> El webhook de push (`pg_net` + trigger a `send-push`) se configura una vez que la edge function `send-push` esté deployada.
+
+---
+
+## ⚡ Edge Functions
+
+| Función | Qué hace | Deploy |
+|---------|----------|--------|
+| `create-payment` | Crea preferencia MP con comisión por tramo | `supabase functions deploy create-payment` |
+| `mp-webhook` | Recibe pagos de MP, valida firma, actualiza estado | `--no-verify-jwt` |
+| `mp-oauth-start` | Genera URL OAuth para que el prestador conecte MP | normal |
+| `mp-oauth-callback` | Intercambia code por tokens y los guarda | `--no-verify-jwt` |
+| `mp-oauth-disconnect` | Borra credenciales MP del prestador | normal |
+| `send-push` | Envía notificaciones push vía FCM | `--no-verify-jwt` |
+
+### Secrets (Supabase)
 
 ```bash
-cp .env.example .env
-# Editá .env con tus keys de Supabase y MercadoPago
+# MercadoPago
+supabase secrets set MP_ACCESS_TOKEN=TEST-...          # token del platform (Modelo A)
+supabase secrets set MP_CLIENT_ID=...                  # OAuth Marketplace
+supabase secrets set MP_CLIENT_SECRET=...              # OAuth Marketplace
+supabase secrets set MP_OAUTH_REDIRECT_URI=https://TU_PROJECT.supabase.co/functions/v1/mp-oauth-callback
+supabase secrets set MP_OAUTH_STATE_SECRET=<hex aleatorio>
+supabase secrets set MP_WEBHOOK_SECRET=...             # firma del webhook MP
+supabase secrets set APP_URL=http://localhost:5173
+supabase secrets set MP_USE_MARKETPLACE=false          # true cuando MP apruebe Marketplace
+
+# Firebase (push)
+supabase secrets set FIREBASE_PROJECT_ID=...
+supabase secrets set FIREBASE_CLIENT_EMAIL=...
+supabase secrets set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
-### 4. Ejecutar el schema de la base de datos
+---
 
-En el **SQL Editor** de Supabase, ejecutá:
-1. `supabase/schema.sql` — crea todas las tablas, RLS y triggers
-2. `supabase/seed.sql` — carga datos de prueba (primero creá los usuarios en Auth)
+## 💰 Monetización
 
-### 5. Correr en desarrollo
+### 1. Comisión por transacción (modelo principal)
 
-```bash
-npm run dev
-# → http://localhost:5173
-```
+Comisión **fija escalonada por tramo de precio**, configurable desde el panel admin (`/admin/commission`) sin redeploy. Tramos por defecto (mayo 2026, ARS):
+
+| Tramo del trabajo | Comisión |
+|---|---|
+| Hasta $30.000 | $2.500 |
+| $30.001 – $100.000 | $7.000 |
+| $100.001 – $300.000 | $15.000 |
+| Más de $300.000 | $25.000 |
+
+Se almacenan en `app_config.commission_tiers` y se snapshotean en cada pago (`payments.commission_tiers_snapshot`) para trazabilidad.
+
+**Dos modos de cobro** (switch `MP_USE_MARKETPLACE`):
+- **Modelo A (actual):** el cobro entra a la cuenta del platform; la comisión se registra y la liquidación al prestador se hace por fuera.
+- **Modelo B (Marketplace):** con OAuth, MP divide automáticamente — el prestador recibe su parte y el platform la comisión. Requiere que MP apruebe el modo Marketplace para la app.
+
+### 2. Publicidad (AdMob)
+
+Banners en pantallas **no críticas** (Index, Search, Dashboard, Favorites). Nunca en JobCreate, JobDetail, ProviderProfile, Login/Register, Settings, Admin. Solo se muestran en builds nativas (no en web).
+
+### 3. Suscripción premium para prestadores (roadmap)
+
+Pendiente. Destacados, badge, estadísticas.
+
+---
+
+## 🔔 Notificaciones
+
+### In-app (la campana del Dashboard)
+
+Se generan **automáticamente vía triggers de base de datos** en: nuevo mensaje, nueva solicitud, cotización, cambios de estado del job (aceptado / en progreso / terminado / confirmado / cancelado) y nueva reseña. Tiempo real vía Supabase Realtime.
+
+### Push nativas (FCM)
+
+Cada notificación dispara `send-push` (trigger `pg_net` → edge function → FCM). Tokens de device en `push_tokens`. Requiere setup de Firebase:
+
+1. Crear proyecto en [console.firebase.google.com](https://console.firebase.google.com)
+2. Service Account → cargar `FIREBASE_*` como secrets
+3. App Android → `google-services.json` en `android/app/`
+4. (iOS) APNs key + cuenta Apple Developer
+
+---
+
+## ⭐ Calificaciones
+
+Las calificaciones son el diferenciador central:
+- Búsqueda **ordenada por mejor calificación** (rating + cantidad de reseñas como desempate)
+- Filtro por calificación mínima (Todas / 4+ / 4.5+)
+- La reseña **solo se habilita** si el trabajo fue confirmado por ambas partes **y** hubo un pago aprobado dentro de la app — así cada calificación proviene de un trabajo real.
+
+---
+
+## 📄 Páginas legales
+
+- `/privacidad` — Política de Privacidad (Ley 25.326)
+- `/terminos` — Términos y Condiciones
+
+⚠️ **Son borradores estándar.** Antes de publicar: completar los datos entre `[corchetes]` (razón social, CUIT, domicilio, email de contacto en `PrivacyPolicy.tsx` y `Terms.tsx`) y revisar con un profesional legal.
 
 ---
 
 ## 📱 Compilar como app móvil (Capacitor)
 
-### Pre-requisitos
-
-| Plataforma | Requisito |
-|-----------|-----------|
-| Android | Android Studio + JDK 17 |
-| iOS | Xcode 15+ (solo macOS) |
-
-### Pasos
-
 ```bash
-# 1. Build del proyecto web
 npm run build
-
-# 2. Agregar plataformas (solo la primera vez)
-npm run cap:add:android
-npm run cap:add:ios   # solo en macOS
-
-# 3. Sincronizar código al proyecto nativo
+npm run cap:add:android      # solo la primera vez
 npm run cap:sync
-
-# 4. Abrir en Android Studio / Xcode
 npm run cap:open:android
-npm run cap:open:ios
 ```
 
-Desde Android Studio / Xcode podés compilar el APK/IPA y publicar en las stores.
-
----
-
-## 💳 Pagos con MercadoPago (Sandbox)
-
-### Configuración
-
-1. Creá una cuenta en [developers.mercadopago.com](https://developers.mercadopago.com)
-2. Obtené las **Test credentials** (Public key + Access token)
-3. Cargalas en `.env`
-
-### Deploy de Edge Functions
-
-```bash
-# Instalar CLI de Supabase
-npm install -g supabase
-
-# Login
-supabase login
-
-# Link al proyecto
-supabase link --project-ref TU_PROJECT_REF
-
-# Deploy functions
-supabase functions deploy create-payment
-supabase functions deploy mp-webhook
-
-# Setear secrets en Supabase
-supabase secrets set MP_ACCESS_TOKEN=TEST-xxxx
-supabase secrets set APP_URL=https://tu-dominio.com
-```
-
-### Configurar Webhook en MercadoPago
-
-En el panel de MercadoPago → Webhooks → agregar:
-```
-https://TU_PROJECT.supabase.co/functions/v1/mp-webhook
-```
-Seleccionar evento: `payment`
-
-### Tarjetas de prueba para sandbox
-
-| Tipo | Número | CVV | Vencimiento |
-|------|--------|-----|-------------|
-| Visa aprobada | 4509 9535 6623 3704 | 123 | 11/25 |
-| Mastercard rechazada | 5031 7557 3453 0604 | 123 | 11/25 |
-
----
-
-## 🌐 Deploy web (Vercel)
-
-```bash
-# Instalar Vercel CLI
-npm install -g vercel
-
-# Deploy
-vercel
-
-# Configurar variables de entorno en vercel.com/dashboard
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-```
+Para AdMob y push en Android, agregar en `AndroidManifest.xml` el App ID de AdMob y poner `google-services.json` en `android/app/`.
 
 ---
 
 ## 👥 Usuarios de prueba
 
-Creá estos usuarios en Supabase Auth > Users, luego corré el `seed.sql`:
-
 | Email | Contraseña | Rol |
 |-------|-----------|-----|
 | admin@servimarket.com | Test1234! | admin |
 | cliente1@test.com | Test1234! | client |
-| cliente2@test.com | Test1234! | client |
-| prestador1@test.com | Test1234! | provider (Gasista) |
-| prestador2@test.com | Test1234! | provider (Electricista) |
-| prestador3@test.com | Test1234! | provider (Plomero) |
-| prestador4@test.com | Test1234! | provider (Pintor) |
-| prestador5@test.com | Test1234! | provider (Carpintero) |
+| gasista@test.com | Test1234! | provider (Carlos Rodríguez) |
+| electricista@test.com | Test1234! | provider (Miguel Torres) |
+| plomero@test.com | Test1234! | provider (Roberto García) |
+
+## 💳 Tarjetas de prueba MercadoPago (sandbox)
+
+| Resultado | Número | CVV | Vto. | Titular |
+|------|--------|-----|------|---------|
+| Aprobada | 4509 9535 6623 3704 | 123 | 11/30 | **APRO** |
+| Rechazada | 4509 9535 6623 3704 | 123 | 11/30 | OTHE |
+| Pendiente | 4509 9535 6623 3704 | 123 | 11/30 | CONT |
+
+> En sandbox, pagar con un **usuario de prueba comprador** distinto del vendedor. El nombre del titular define el resultado.
 
 ---
 
-## ✅ Criterios de aceptación (MVP)
+## ✅ Estado del MVP
 
-- [x] Registro/login con roles (cliente / prestador)
-- [x] Cliente busca prestadores por categoría, rating, disponibilidad
-- [x] Cliente crea job → prestador recibe notificación → acepta/rechaza
-- [x] Estados del job: pending → accepted → in_progress → completed
-- [x] Chat en tiempo real entre cliente y prestador
-- [x] Pago en sandbox via MercadoPago (webhook actualiza estado)
-- [x] Cliente puntúa y deja comentario → rating promedio se actualiza
-- [x] Panel de admin: gestionar usuarios, verificar prestadores
-- [x] Código exportable y compilable como app web + iOS/Android
+- [x] Auth con roles (cliente / prestador / admin) + recuperar contraseña
+- [x] Búsqueda con filtro y orden por calificación
+- [x] Jobs: cotizaciones, chat realtime, estados
+- [x] Doble confirmación de finalización (prestador marca → cliente confirma)
+- [x] Pagos con MercadoPago + comisión escalonada
+- [x] Reseñas con respaldo de pago real
+- [x] Avatar y fotos de trabajos
+- [x] Notificaciones in-app + backend de push (FCM)
+- [x] Panel admin (usuarios, prestadores, trabajos, comisiones)
+- [x] Páginas legales (privacidad + términos)
+- [x] AdMob en pantallas no críticas
 
 ---
 
-## 🔐 Seguridad (checklist para producción)
+## 🔜 Pendientes para producción
 
+- [ ] **Rotar la clave de Firebase** si se expuso durante el setup
+- [ ] Completar datos legales `[corchetes]` + revisión profesional
+- [ ] Configurar SMTP propio en Supabase Auth (emails de reset)
+- [ ] Agregar Redirect URLs de reset password en Supabase Auth
 - [ ] Activar verificación de email en Supabase Auth
-- [ ] Habilitar SMS auth (opcional, via Twilio)
-- [ ] Revisar todas las políticas RLS en Supabase (ya incluidas en schema.sql)
-- [ ] Configurar CORS en Supabase Functions
-- [ ] Rotar keys antes de production
-- [ ] Configurar rate limiting en Supabase
-- [ ] Agregar validación de firma en webhook de MercadoPago
-- [ ] Activar HTTPS en dominio propio
-- [ ] Configurar alertas de errores (Sentry recomendado)
-- [ ] Para facturar en Argentina: cumplir con requisitos de AFIP para marketplace (Res. Gral. 4549)
-
----
-
-## 📊 Modelo de datos
-
-```
-users (1) ──────── (1) providers
-                         │
-                    (1) ─┤─ (N) jobs
-                         │         │
-                    clients (1)    ├─ (N) messages
-                                   ├─ (1) reviews
-                                   └─ (1) payments
-```
-
----
-
-## 🗺 Roadmap post-MVP
-
-- [ ] Notificaciones push reales (Firebase FCM)
-- [ ] Búsqueda geográfica por radio GPS real (PostGIS)
-- [ ] Integración Stripe para pagos internacionales
-- [ ] Sistema de disputas/reclamos
-- [ ] Fotos de trabajos realizados en perfil
-- [ ] Chat con imágenes
-- [ ] Suscripción premium para prestadores
-- [ ] Internacionalización (i18n en inglés)
-
----
-
-## 🧪 Tests
-
-```bash
-npm run test
-```
-
-Los tests básicos cubren: auth flows, crear job, aceptar job, crear review.
+- [ ] IDs reales de AdMob + política de privacidad pública (URL Vercel)
+- [ ] `google-services.json` (Android) y APNs (iOS) para recibir push
+- [ ] Solicitar modo Marketplace a MercadoPago (split automático)
+- [ ] Cumplimiento AFIP para marketplace (Res. Gral. 4549)
+- [ ] Validación de firma en webhook MP + rate limiting
 
 ---
 
 ## 📄 Licencia
 
-MIT — Libre para uso personal y comercial.
+MIT

@@ -1,177 +1,239 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { supabase, uploadFile, getStorageUrl } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
-import { useToast } from "../components/ui/use-toast";
-import { ArrowLeft, Loader2, Send, MapPin, Calendar, DollarSign, FileText, Tag, CheckCircle2 } from "lucide-react";
+import { useTheme } from "../lib/theme";
+import { CATEGORIES, categoryById } from "../lib/categories";
+import { Button, Field, Avatar, toast } from "../components/mobile/kit";
+import { Icon, CategoryIcon } from "../components/mobile/Icon";
+import { MobileScreen } from "../components/mobile/MobileScreen";
 
-const CATEGORIES = [
-  "Gasista","Electricista","Plomero","Flete","Pintor",
-  "Cerrajero","Carpintero","Jardinero","Limpieza","Técnico Aire","Albañil"
-];
+const STEPS = ["Categoría", "Detalles", "Cuándo", "Revisar"];
 
 export default function JobCreate() {
+  const t = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const providerId = searchParams.get("provider");
+  const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [provider, setProvider] = useState<any>(null);
-  const [form, setForm] = useState({ category: "", description: "", address: "", scheduledAt: "", price: "" });
-  const providerId = searchParams.get("provider");
+  const [catId, setCatId] = useState<string>("");
+  const [form, setForm] = useState({ description: "", address: "", scheduledAt: "", price: "" });
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Los pedidos siempre van dirigidos a un prestador: sin ?provider, a buscar uno.
+  useEffect(() => {
+    if (!providerId) navigate("/search", { replace: true });
+  }, [providerId, navigate]);
 
   useEffect(() => {
     if (providerId) {
-      supabase.from("providers").select("*, users(*)").eq("id", providerId).single()
-        .then(({ data }) => { setProvider(data); if (data?.categories[0]) setForm(f => ({...f, category: data.categories[0]})); });
+      supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("id", providerId).single().then(({ data }) => {
+        setProvider(data);
+        // si el prestador tiene una sola categoría del catálogo, se preselecciona
+        const matches = CATEGORIES.filter(x => data?.categories?.includes(x.dbName));
+        if (matches.length === 1) { setCatId(matches[0].id); setStep(1); }
+      });
     }
   }, [providerId]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user || !form.category || !form.description || !form.address) {
-      toast({ title: "Completa todos los campos requeridos", variant: "destructive" }); return;
-    }
+  // en el paso de categoría solo se ofrecen las del prestador elegido
+  const providerCats = provider
+    ? CATEGORIES.filter(c => provider.categories?.includes(c.dbName))
+    : [];
+  const selectableCats = providerCats.length > 0 ? providerCats : CATEGORIES;
+
+  const cat = categoryById(catId);
+  const canNext =
+    (step === 0 && !!catId) ||
+    (step === 1 && form.description.trim().length > 3) ||
+    (step === 2 && form.address.trim().length > 5) ||
+    step === 3;
+
+  async function submit() {
+    if (!user) { navigate(`/login?redirect=/jobs/new${providerId ? `?provider=${providerId}` : ""}`); return; }
+    if (!cat || !providerId) return;
     setLoading(true);
     const { data, error } = await supabase.from("jobs").insert({
-      client_id: user.id, provider_id: providerId ?? null,
-      category: form.category, description: form.description,
+      client_id: user.id, provider_id: providerId,
+      category: cat.dbName, description: form.description,
       address: form.address, scheduled_at: form.scheduledAt || null,
-      price: form.price ? parseFloat(form.price) : null, status: "pending"
+      price: form.price ? parseFloat(form.price) : null, status: "pending",
+      photos,
     }).select().single();
     setLoading(false);
-    if (error) { toast({ title: "Error al crear el trabajo", variant: "destructive" }); return; }
-    toast({ title: "Solicitud enviada!" });
+    if (error) { toast("Error al crear el pedido", "shield"); return; }
+    toast("¡Pedido publicado!", "check");
     navigate(`/jobs/${data.id}`);
   }
 
-  const isValid = form.category && form.description && form.address;
+  const next = () => step < STEPS.length - 1 ? setStep(step + 1) : submit();
+  const prev = () => step > 0 ? setStep(step - 1) : navigate(-1);
+
+  // Subida de foto del problema (bucket avatars, carpeta jobs/)
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user || photos.length >= 4) return;
+    setUploadingPhoto(true);
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `jobs/${user.id}_${Date.now()}.${ext}`;
+    const uploaded = await uploadFile("avatars", path, file);
+    setUploadingPhoto(false);
+    if (uploaded) setPhotos(p => [...p, getStorageUrl("avatars", uploaded)]);
+    else toast("No se pudo subir la foto", "shield");
+  }
+
+  const H = ({ children }: { children: React.ReactNode }) => (
+    <h2 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 30, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em", lineHeight: 1.1 }}>{children}</h2>
+  );
+  const Sub = ({ children }: { children: React.ReactNode }) => (
+    <p style={{ marginTop: 8, fontFamily: t.fontBody, fontSize: 14, color: t.inkMute }}>{children}</p>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-lg mx-auto px-4 flex items-center gap-3 h-16">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+    <MobileScreen>
+      <div style={{ position: "absolute", inset: 0, background: t.bg, zIndex: 40, display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "54px 16px 0", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={prev} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name={step === 0 ? "close" : "arrow-left"} size={20} color={t.ink} />
           </button>
-          <div>
-            <h1 className="font-semibold text-gray-900">Nueva solicitud</h1>
-            <p className="text-xs text-gray-400">Describe el trabajo que necesitas</p>
+          <div style={{ flex: 1, fontFamily: t.fontBody, fontSize: 12, color: t.inkMute, textAlign: "center" }}>
+            Paso <strong style={{ color: t.ink }}>{step + 1}</strong> de {STEPS.length} · {STEPS[step]}
+          </div>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={{ padding: "12px 20px 0" }}>
+          <div style={{ height: 5, background: t.surfaceAlt, borderRadius: 99 }}>
+            <div style={{ width: `${((step + 1) / STEPS.length) * 100}%`, height: "100%", background: t.green, borderRadius: 99, transition: "width .25s" }} />
           </div>
         </div>
-      </header>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        {/* Provider banner */}
-        {provider && (
-          <div className="bg-green-50 border border-green-100 rounded-2xl p-4 flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-green-100 flex items-center justify-center font-bold text-green-700">
-              {provider.users?.name?.charAt(0).toUpperCase()}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px 20px" }}>
+          {provider && step > 0 && (
+            <div style={{ marginBottom: 18, padding: 12, background: t.greenSoft, borderRadius: t.radiusSm, display: "flex", alignItems: "center", gap: 10 }}>
+              <Avatar initials={provider.users?.name?.charAt(0).toUpperCase() ?? "P"} hue={t.green} size={34} />
+              <div style={{ fontFamily: t.fontBody, fontSize: 13, color: t.greenDeep }}>Pedido dirigido a <strong>{provider.users?.name}</strong></div>
             </div>
-            <div>
-              <p className="font-semibold text-sm text-gray-900">{provider.users?.name}</p>
-              <p className="text-xs text-green-600">{provider.categories.join(", ")} Â· Disponible</p>
-            </div>
-            <CheckCircle2 className="h-5 w-5 text-green-500 ml-auto" />
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* Category */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-              <Tag className="h-4 w-4 text-green-600" /> Categoría de servicio *
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {CATEGORIES.map(c => (
-                <button key={c} type="button" onClick={() => setForm(f => ({...f, category: c}))}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-medium transition-all border ${
-                    form.category === c
-                      ? "bg-green-600 text-white border-green-600 shadow-sm"
-                      : "bg-gray-50 text-gray-600 border-gray-100 hover:border-green-200 hover:bg-green-50"
-                  }`}>
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-              <FileText className="h-4 w-4 text-green-600" /> Descripción del trabajo *
-            </label>
-            <textarea
-              value={form.description}
-              onChange={e => setForm(f => ({...f, description: e.target.value}))}
-              required
-              placeholder="Describe que necesitas con el mayor detalle posible. Por ejemplo: tengo una perdida de agua en el bano, el caí±o esta debajo del lavabo..."
-              className="w-full min-h-[110px] bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all placeholder:text-gray-300"
-            />
-            <p className="text-xs text-gray-400 mt-2">{form.description.length}/500 caracteres</p>
-          </div>
-
-          {/* Address */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-5">
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 mb-3">
-              <MapPin className="h-4 w-4 text-green-600" /> Dirección del trabajo *
-            </label>
-            <input
-              value={form.address}
-              onChange={e => setForm(f => ({...f, address: e.target.value}))}
-              required
-              placeholder="Calle 123, Barrio, Ciudad"
-              className="w-full h-11 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all placeholder:text-gray-300"
-            />
-          </div>
-
-          {/* Date + Price */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white border border-gray-100 rounded-2xl p-4">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 mb-2">
-                <Calendar className="h-3.5 w-3.5 text-green-600" /> Fecha (opcional)
-              </label>
-              <input
-                type="datetime-local"
-                value={form.scheduledAt}
-                onChange={e => setForm(f => ({...f, scheduledAt: e.target.value}))}
-                className="w-full h-9 bg-gray-50 border border-gray-100 rounded-xl px-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all"
-              />
-            </div>
-            <div className="bg-white border border-gray-100 rounded-2xl p-4">
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 mb-2">
-                <DollarSign className="h-3.5 w-3.5 text-green-600" /> Presupuesto max.
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">$</span>
-                <input
-                  type="number"
-                  value={form.price}
-                  onChange={e => setForm(f => ({...f, price: e.target.value}))}
-                  placeholder="0"
-                  className="w-full h-9 bg-gray-50 border border-gray-100 rounded-xl pl-6 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading || !isValid}
-            className="w-full h-13 bg-green-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-green-200 py-4"
-          >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-            {loading ? "Enviando..." : "Enviar solicitud"}
-          </button>
-
-          {!isValid && (
-            <p className="text-center text-xs text-gray-400">Completa Categoría, Descripción y Dirección para continuar</p>
           )}
-        </form>
+
+          {step === 0 && (
+            <>
+              <H>¿Qué servicio<br />necesitás?</H>
+              <Sub>Elegí una categoría.</Sub>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 22 }}>
+                {selectableCats.map(c => {
+                  const on = catId === c.id;
+                  return (
+                    <button key={c.id} onClick={() => setCatId(c.id)} style={{
+                      all: "unset", cursor: "pointer", padding: 14, background: on ? t.ink : t.surface,
+                      border: `1.5px solid ${on ? t.ink : t.lineSoft}`, borderRadius: t.radius,
+                      display: "flex", flexDirection: "column", gap: 14, boxShadow: on ? "0 8px 24px -10px rgba(0,0,0,0.30)" : t.shadow,
+                    }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 12, background: on ? "rgba(255,255,255,0.10)" : `${c.hue}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <CategoryIcon name={c.id} size={24} color={on ? "#fff" : c.hue} />
+                      </div>
+                      <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 14.5, color: on ? "#fff" : t.ink }}>{c.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <H>Contanos<br />el trabajo</H>
+              <Sub>Cuanto más claro, mejor cotización vas a recibir.</Sub>
+              <div style={{ marginTop: 22 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 600, color: t.inkMute, marginBottom: 6, letterSpacing: "0.02em", textTransform: "uppercase" }}>Descripción</div>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Contá qué necesitás, equipo que tenés, espacio, etc."
+                  style={{ width: "100%", minHeight: 140, boxSizing: "border-box", resize: "none", padding: "12px 14px", background: t.surface, border: `1px solid ${t.line}`, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14.5, color: t.ink, outline: "none" }} />
+              </div>
+
+              {/* fotos del problema (opcional) */}
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 600, color: t.inkMute, marginBottom: 6, letterSpacing: "0.02em", textTransform: "uppercase" }}>Fotos (opcional)</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {photos.map(url => (
+                    <div key={url} style={{ position: "relative", width: 72, height: 72 }}>
+                      <img src={url} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 12, border: `1px solid ${t.line}` }} />
+                      <button onClick={() => setPhotos(p => p.filter(u => u !== url))} style={{ all: "unset", cursor: "pointer", position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: 999, background: t.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="close" size={12} color="#fff" />
+                      </button>
+                    </div>
+                  ))}
+                  {photos.length < 4 && (
+                    <label style={{ width: 72, height: 72, borderRadius: 12, border: `1.5px dashed ${t.line}`, background: t.surface, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      {uploadingPhoto
+                        ? <span style={{ fontFamily: t.fontBody, fontSize: 11, color: t.inkMute }}>...</span>
+                        : <Icon name="plus" size={22} color={t.inkSoft} stroke={2} />}
+                      <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} disabled={uploadingPhoto} />
+                    </label>
+                  )}
+                </div>
+                <div style={{ marginTop: 6, fontFamily: t.fontBody, fontSize: 11.5, color: t.inkSoft }}>Una buena foto ayuda a cotizar mejor. Hasta 4.</div>
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <H>¿Dónde y cuándo?</H>
+              <Sub>Solo el prestador asignado verá la dirección exacta.</Sub>
+              <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+                <Field label="Dirección" value={form.address} onChange={(v: string) => setForm(f => ({ ...f, address: v }))} placeholder="Calle 123, Barrio, Ciudad" />
+                <div>
+                  <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 600, color: t.inkMute, marginBottom: 6, letterSpacing: "0.02em", textTransform: "uppercase" }}>Fecha (opcional)</div>
+                  <input type="datetime-local" value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))}
+                    style={{ width: "100%", boxSizing: "border-box", height: 46, padding: "0 14px", background: t.surface, border: `1px solid ${t.line}`, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, color: t.ink, outline: "none" }} />
+                </div>
+                <Field label="Presupuesto máximo (opcional)" value={form.price} onChange={(v: string) => setForm(f => ({ ...f, price: v }))} placeholder="0" type="number" />
+              </div>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <H>Revisá y enviá</H>
+              <Sub>{provider?.users?.name ? `Tu pedido le llega directo a ${provider.users.name}.` : "Tu pedido le llega directo al prestador."}</Sub>
+              <div style={{ marginTop: 22, background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  ["Categoría", cat?.label ?? "—"],
+                  ["Descripción", form.description || "—"],
+                  ["Dirección", form.address],
+                  ["Cuándo", form.scheduledAt ? new Date(form.scheduledAt).toLocaleString("es-AR") : "Flexible"],
+                  ["Presupuesto", form.price ? `$${Number(form.price).toLocaleString("es-AR")}` : "A cotizar"],
+                  ["Fotos", photos.length > 0 ? `${photos.length}` : "Sin fotos"],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <span style={{ fontFamily: t.fontBody, fontSize: 11.5, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{k}</span>
+                    <span style={{ fontFamily: t.fontBody, fontSize: 14, color: t.ink, fontWeight: 600, textAlign: "right" }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 20, padding: 16, background: t.greenSoft, borderRadius: t.radiusSm, display: "flex", gap: 12 }}>
+                <Icon name="shield" size={20} color={t.green} />
+                <div style={{ fontFamily: t.fontBody, fontSize: 12.5, color: t.greenDeep, lineHeight: 1.5 }}>
+                  <strong>Sin compromiso.</strong> El prestador te responde con una cotización; si te cierra la aceptás y pagás por la app cuando el trabajo esté hecho.
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: "14px 20px 30px", background: t.bg, borderTop: `1px solid ${t.lineSoft}` }}>
+          <Button variant="green" size="lg" full onClick={next} disabled={!canNext || loading}
+            iconRight={step < STEPS.length - 1 ? <Icon name="arrow-right" size={18} color="#fff" /> : undefined}>
+            {loading ? "Publicando..." : step < STEPS.length - 1 ? "Continuar" : "Publicar pedido"}
+          </Button>
+        </div>
       </div>
-    </div>
+    </MobileScreen>
   );
 }

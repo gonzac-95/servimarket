@@ -14,12 +14,14 @@ export interface Provider {
   price_list: PriceItem[]; photos: string[]; service_radius_km: number;
   service_zones: string[]; documents_verified: boolean; cuit_cuil?: string;
   rating_avg: number; reviews_count: number; is_available: boolean;
+  mp_user_id?: string | null; mp_connected_at?: string | null;
   created_at: string; users?: User;
 }
 export interface Job {
   id: string; client_id: string; provider_id?: string; category: string;
   description: string; price?: number; status: JobStatus; scheduled_at?: string;
   address: string; lat?: number; lng?: number; photos: string[];
+  provider_completed_at?: string | null; client_confirmed_at?: string | null;
   created_at: string; updated_at: string;
   clients?: User; providers?: Provider & { users?: User };
 }
@@ -33,10 +35,12 @@ export interface Review {
 }
 export interface Payment {
   id: string; job_id: string; amount: number; provider_share?: number;
-  platform_fee?: number; status: PaymentStatus; payment_provider?: PaymentProvider;
+  platform_fee?: number; commission_tiers_snapshot?: CommissionTier[] | null;
+  status: PaymentStatus; payment_provider?: PaymentProvider;
   provider_payment_id?: string; preference_id?: string; checkout_url?: string;
   created_at: string; updated_at: string;
 }
+export interface CommissionTier { max: number | null; fee: number; }
 export interface Notification {
   id: string; user_id: string; title: string; body: string;
   type?: string; data: Record<string, unknown>; read: boolean; created_at: string;
