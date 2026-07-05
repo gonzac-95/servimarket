@@ -15,17 +15,41 @@ export default function Register() {
   const [pass, setPass] = useState("");
   const [accept, setAccept] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function handleSubmit() {
     if (loading) return;
     if (pass.length < 8) { toast("La contraseña debe tener 8+ caracteres", "close"); return; }
     if (!accept) { toast("Aceptá los términos para continuar", "close"); return; }
     setLoading(true);
-    const { error } = await signUp(email.trim(), pass, name.trim(), role);
+    const { error, needsConfirmation } = await signUp(email.trim(), pass, name.trim(), role);
     setLoading(false);
     if (error) { toast("No se pudo crear la cuenta", "close"); return; }
+    // Con verificación de email activa, no hay sesión hasta confirmar
+    if (needsConfirmation) { setSent(true); return; }
     toast("¡Cuenta creada!");
     navigate(role === "provider" ? "/settings" : "/dashboard", { replace: true });
+  }
+
+  if (sent) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", maxWidth: 480, margin: "0 auto", padding: 24, boxSizing: "border-box" }}>
+        <div style={{ width: 76, height: 76, borderRadius: 24, background: t.greenSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name="chat" size={36} color={t.green} />
+        </div>
+        <h1 style={{ margin: "24px 0 0", fontFamily: t.fontDisplay, fontSize: 28, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em", textAlign: "center" }}>Revisá tu correo</h1>
+        <p style={{ marginTop: 12, fontFamily: t.fontBody, fontSize: 14.5, color: t.inkMute, textAlign: "center", lineHeight: 1.55, maxWidth: 320 }}>
+          Te mandamos un link de confirmación a<br /><strong style={{ color: t.ink }}>{email.trim()}</strong>.<br />
+          Tocalo y después ingresá con tu contraseña.
+        </p>
+        <p style={{ marginTop: 8, fontFamily: t.fontBody, fontSize: 12.5, color: t.inkSoft, textAlign: "center" }}>
+          ¿No llega? Mirá en spam o correo no deseado.
+        </p>
+        <div style={{ marginTop: 28, width: "100%", maxWidth: 320 }}>
+          <Button variant="green" size="lg" full onClick={() => navigate("/login")}>Ir a ingresar</Button>
+        </div>
+      </div>
+    );
   }
 
   return (

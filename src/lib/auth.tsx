@@ -1,7 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabase';
 import { User, Provider } from '../types';
+
+// URL pública de la web: los links de los emails (confirmación, reset)
+// siempre aterrizan en la web, incluso si la acción se inició desde la app.
+export const PUBLIC_WEB_URL = Capacitor.isNativePlatform()
+  ? 'https://servimarket-two.vercel.app'
+  : window.location.origin;
 
 interface AuthContextType {
   supabaseUser: SupabaseUser | null;
@@ -9,7 +16,7 @@ interface AuthContextType {
   provider: Provider | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, name: string, role: 'client' | 'provider') => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, name: string, role: 'client' | 'provider') => Promise<{ error: Error | null; needsConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -80,11 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signUp(email: string, password: string, name: string, role: 'client' | 'provider') {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { name, role } },
+      options: {
+        data: { name, role },
+        emailRedirectTo: `${PUBLIC_WEB_URL}/login?confirmed=1`,
+      },
     });
-    return { error: error as Error | null };
+    // Con "Confirm email" activo en Supabase no hay sesión hasta confirmar.
+    const needsConfirmation = !error && !data.session;
+    return { error: error as Error | null, needsConfirmation };
   }
 
   async function signIn(email: string, password: string) {
@@ -100,9 +112,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Envía el email con el link para restablecer la contraseña.
+  // El link siempre apunta a la web pública (desde la app nativa,
+  // window.location.origin sería https://localhost y el link no andaría).
   async function resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${PUBLIC_WEB_URL}/reset-password`,
     });
     return { error: error as Error | null };
   }

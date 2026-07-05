@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
-import { useAuth } from "../lib/auth";
+import { useAuth, PUBLIC_WEB_URL } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { useTheme } from "../lib/theme";
 import { Button, Field, GoogleG, toast } from "../components/mobile/kit";
@@ -19,14 +19,43 @@ export default function Login() {
   const [pass, setPass] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  // Vuelta desde el link de confirmación del email
+  useEffect(() => {
+    if (searchParams.get("confirmed")) toast("¡Email confirmado! Ya podés ingresar.", "check");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogin() {
     if (loading) return;
     setLoading(true);
     const { error } = await signIn(email.trim(), pass);
     setLoading(false);
-    if (error) { toast("Email o contraseña incorrectos", "close"); return; }
+    if (error) {
+      if (/not confirmed/i.test(error.message)) {
+        setNeedsConfirm(true);
+        toast("Tenés que confirmar tu email antes de ingresar", "close");
+      } else {
+        toast("Email o contraseña incorrectos", "close");
+      }
+      return;
+    }
     navigate(redirect, { replace: true });
+  }
+
+  async function resendConfirmation() {
+    if (resending || !email.trim()) return;
+    setResending(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: { emailRedirectTo: `${PUBLIC_WEB_URL}/login?confirmed=1` },
+    });
+    setResending(false);
+    if (error) { toast("No se pudo reenviar. Probá en unos minutos.", "close"); return; }
+    toast("Te reenviamos el correo de confirmación", "check");
   }
 
   async function handleGoogle() {
@@ -72,6 +101,16 @@ export default function Login() {
         <div style={{ textAlign: "right" }}>
           <button onClick={() => navigate("/forgot-password")} style={{ all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 600, color: t.green }}>¿Olvidaste tu contraseña?</button>
         </div>
+        {needsConfirm && (
+          <div style={{ padding: 14, background: "rgba(232,168,43,0.10)", border: "1px solid rgba(232,168,43,0.30)", borderRadius: t.radiusSm }}>
+            <div style={{ fontFamily: t.fontBody, fontSize: 13, color: "#9B6B12", lineHeight: 1.5 }}>
+              Tu cuenta todavía no está confirmada. Buscá el correo que te mandamos (revisá spam) o pedí uno nuevo.
+            </div>
+            <button onClick={resendConfirmation} disabled={resending} style={{ all: "unset", cursor: "pointer", marginTop: 8, fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 700, color: t.green, opacity: resending ? 0.6 : 1 }}>
+              {resending ? "Enviando..." : "Reenviar correo de confirmación"}
+            </button>
+          </div>
+        )}
       </div>
       <div style={{ padding: "0 24px 30px", display: "flex", flexDirection: "column", gap: 16 }}>
         <Button variant="green" size="lg" full onClick={handleLogin} disabled={loading}>{loading ? "Ingresando..." : "Ingresar"}</Button>
