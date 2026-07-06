@@ -2,7 +2,7 @@ import LegalLayout, { LegalSection } from "../components/LegalLayout";
 
 // NOTA: Borrador estándar. Revisar con un profesional legal antes de publicar.
 // Completar los campos entre [corchetes] con los datos reales del titular.
-const CONTACT_EMAIL = "contacto@servimarket.com"; // TODO: reemplazar por el email real
+const CONTACT_EMAIL = "contacto@servimarket.app";
 
 export default function Terms() {
   return (

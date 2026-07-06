@@ -74,8 +74,8 @@ export default function Help() {
           <div style={{ marginTop: 20, padding: 18, background: t.surfaceDeep, borderRadius: t.radius, color: "#fff" }}>
             <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700 }}>¿No encontraste tu respuesta?</div>
             <div style={{ fontFamily: t.fontBody, fontSize: 12.5, opacity: 0.7, marginTop: 4, lineHeight: 1.5 }}>Escribinos y te respondemos lo antes posible.</div>
-            <a href="mailto:soporte@servimarket.com" style={{ textDecoration: "none", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 46, background: t.green, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>
-              <Icon name="chat" size={17} color="#fff" /> soporte@servimarket.com
+            <a href="mailto:soporte@servimarket.app" style={{ textDecoration: "none", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 46, background: t.green, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>
+              <Icon name="chat" size={17} color="#fff" /> soporte@servimarket.app
             </a>
           </div>
         </div>

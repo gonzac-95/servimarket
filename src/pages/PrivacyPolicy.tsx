@@ -2,7 +2,7 @@ import LegalLayout, { LegalSection } from "../components/LegalLayout";
 
 // NOTA: Borrador estándar. Revisar con un profesional legal antes de publicar.
 // Completar los campos entre [corchetes] con los datos reales del titular.
-const CONTACT_EMAIL = "contacto@servimarket.com"; // TODO: reemplazar por el email real
+const CONTACT_EMAIL = "contacto@servimarket.app";
 
 export default function PrivacyPolicy() {
   return (
@@ -61,7 +61,7 @@ export default function PrivacyPolicy() {
           Como titular de los datos, tenés derecho a acceder, rectificar, actualizar y solicitar
           la supresión de tus datos personales. Podés eliminar tu cuenta directamente desde la
           app (Perfil → Eliminar mi cuenta) o siguiendo las instrucciones en{" "}
-          <a href="/eliminar-cuenta" className="text-green-600 hover:underline">servimarket.com/eliminar-cuenta</a>.
+          <a href="/eliminar-cuenta" className="text-green-600 hover:underline">servimarket.app/eliminar-cuenta</a>.
           También podés escribirnos a{" "}
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-green-600 hover:underline">{CONTACT_EMAIL}</a>.
         </p>

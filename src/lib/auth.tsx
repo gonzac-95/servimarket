@@ -7,7 +7,7 @@ import { User, Provider } from '../types';
 // URL pública de la web: los links de los emails (confirmación, reset)
 // siempre aterrizan en la web, incluso si la acción se inició desde la app.
 export const PUBLIC_WEB_URL = Capacitor.isNativePlatform()
-  ? 'https://servimarket-two.vercel.app'
+  ? 'https://servimarket.app'
   : window.location.origin;
 
 interface AuthContextType {

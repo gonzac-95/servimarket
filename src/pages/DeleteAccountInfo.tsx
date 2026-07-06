@@ -43,8 +43,8 @@ export default function DeleteAccountInfo() {
       <LegalSection title="¿No podés acceder a la app?">
         <p>
           Si perdiste el acceso a tu cuenta, escribinos a{" "}
-          <a href="mailto:soporte@servimarket.com" className="text-green-700 underline font-medium">
-            soporte@servimarket.com
+          <a href="mailto:soporte@servimarket.app" className="text-green-700 underline font-medium">
+            soporte@servimarket.app
           </a>{" "}
           desde el correo con el que te registraste y procesamos la eliminación
           en un plazo máximo de 30 días.
