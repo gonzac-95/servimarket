@@ -22,18 +22,29 @@ export default function Search() {
   const [sort, setSort] = useState<"rating" | "reviews">("rating");
   const [showFilters, setShowFilters] = useState(false);
   const userCity = user?.city?.trim() || null;
-  const [zone, setZone] = useState<"city" | "all">("all");
+  // Ciudad activa del filtro: null = todo el país. Por defecto, la del usuario.
+  const [zoneCity, setZoneCity] = useState<string | null>(null);
+  const [cities, setCities] = useState<string[]>([]);
 
-  // Por defecto se busca en la ciudad del usuario (cuando la tiene cargada)
-  useEffect(() => { if (userCity) setZone("city"); }, [userCity]);
+  useEffect(() => { if (userCity) setZoneCity(userCity); }, [userCity]);
+
+  // Ciudades donde hay prestadores disponibles (para buscar en otra ciudad)
+  useEffect(() => {
+    supabase.from("providers").select("users!inner(city)").eq("is_available", true).limit(500)
+      .then(({ data }) => {
+        const set = new Set<string>();
+        (data ?? []).forEach((r: any) => { const c = r.users?.city?.trim(); if (c) set.add(c); });
+        setCities([...set].sort((a, b) => a.localeCompare(b, "es")));
+      });
+  }, []);
 
   const search = useCallback(async () => {
     setLoading(true);
-    const byCity = zone === "city" && !!userCity;
+    const byCity = !!zoneCity;
     let q = supabase.from("providers")
       .select(byCity ? "*, users!inner(id,name,avatar_url,city)" : "*, users(id,name,avatar_url,city)")
       .eq("is_available", true).limit(40);
-    if (byCity) q = q.ilike("users.city", userCity!);
+    if (byCity) q = q.ilike("users.city", zoneCity!);
     const dbName = cat ? categoryById(cat)?.dbName : undefined;
     if (dbName) q = q.contains("categories", [dbName]);
     if (minRating === "4") q = q.gte("rating_avg", 4);
@@ -43,7 +54,7 @@ export default function Search() {
     const { data } = await q;
     setProviders((data as unknown as Provider[]) ?? []);
     setLoading(false);
-  }, [cat, minRating, sort, zone, userCity]);
+  }, [cat, minRating, sort, zoneCity]);
 
   useEffect(() => { search(); }, [search]);
 
@@ -85,7 +96,7 @@ export default function Search() {
         {/* orden */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 20px 6px" }}>
           <div style={{ fontFamily: t.fontBody, fontSize: 13, color: t.inkMute }}>
-            <strong style={{ color: t.ink, fontWeight: 700 }}>{results.length}</strong> resultados{catObj ? ` · ${catObj.label}` : ""}{zone === "city" && userCity ? ` · ${userCity}` : ""}
+            <strong style={{ color: t.ink, fontWeight: 700 }}>{results.length}</strong> resultados{catObj ? ` · ${catObj.label}` : ""}{zoneCity ? ` · ${zoneCity}` : ""}
           </div>
           <select value={sort} onChange={e => setSort(e.target.value as "rating" | "reviews")} style={{
             all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 600, color: t.ink,
@@ -108,15 +119,31 @@ export default function Search() {
                 <Chip key={opt.id} active={minRating === opt.id} onClick={() => setMinRating(opt.id)}>{opt.label}</Chip>
               ))}
             </div>
-            {userCity && (
-              <>
-                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", margin: "12px 0 8px" }}>Zona</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Chip active={zone === "city"} onClick={() => setZone("city")} icon={<Icon name="pin-fill" size={13} color={zone === "city" ? "#fff" : t.green} />}>{userCity}</Chip>
-                  <Chip active={zone === "all"} onClick={() => setZone("all")}>Todo el país</Chip>
-                </div>
-              </>
-            )}
+            <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", margin: "12px 0 8px" }}>Zona</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {userCity && (
+                <Chip active={zoneCity?.toLowerCase() === userCity.toLowerCase()} onClick={() => setZoneCity(userCity)} icon={<Icon name="pin-fill" size={13} color={zoneCity?.toLowerCase() === userCity.toLowerCase() ? "#fff" : t.green} />}>{userCity}</Chip>
+              )}
+              <Chip active={!zoneCity} onClick={() => setZoneCity(null)}>Todo el país</Chip>
+              {/* buscar en cualquier otra ciudad con prestadores */}
+              {cities.filter(c => c.toLowerCase() !== userCity?.toLowerCase()).length > 0 && (() => {
+                const others = cities.filter(c => c.toLowerCase() !== userCity?.toLowerCase());
+                const isOther = !!zoneCity && zoneCity.toLowerCase() !== userCity?.toLowerCase();
+                return (
+                  <select value={isOther ? zoneCity! : ""} onChange={e => { if (e.target.value) setZoneCity(e.target.value); }} style={{
+                    cursor: "pointer", fontFamily: t.fontBody, fontSize: 13, fontWeight: 600,
+                    color: isOther ? "#fff" : t.ink, background: isOther ? t.ink : t.surface,
+                    border: `1.5px solid ${isOther ? t.ink : t.line}`, borderRadius: 999, padding: "7px 26px 7px 12px",
+                    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='${encodeURIComponent(isOther ? "#ffffff" : t.ink)}' stroke-width='2.5'><path d='M6 9l6 6 6-6'/></svg>")`,
+                    backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center",
+                    WebkitAppearance: "none", MozAppearance: "none", appearance: "none", outline: "none",
+                  }}>
+                    <option value="" disabled>Otra ciudad…</option>
+                    {others.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -127,10 +154,10 @@ export default function Search() {
           ) : results.length === 0 ? (
             <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🔍</div>
-              {zone === "city" && userCity ? (
+              {zoneCity ? (
                 <>
-                  <div>Sin resultados en {userCity}.</div>
-                  <button onClick={() => setZone("all")} style={{ all: "unset", cursor: "pointer", marginTop: 12, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: t.green }}>
+                  <div>Sin resultados en {zoneCity}.</div>
+                  <button onClick={() => setZoneCity(null)} style={{ all: "unset", cursor: "pointer", marginTop: 12, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: t.green }}>
                     Buscar en todo el país
                   </button>
                 </>
