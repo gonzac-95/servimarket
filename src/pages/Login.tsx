@@ -74,7 +74,7 @@ export default function Login() {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", overflowY: "auto" }}>
       <div style={{ padding: "54px 20px 0" }}>
         <button onClick={() => navigate("/")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="arrow-left" size={20} color={t.ink} />
