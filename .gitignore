@@ -53,6 +53,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# ===== Firma de release (NUNCA commitear) =====
+android/key.properties
+*.keystore
+*.jks
+
 # ===== Capacitor / Android / iOS =====
 # La carpeta android/ y ios/ se commitean, pero NO los build artifacts:
 android/.gradle/
