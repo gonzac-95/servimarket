@@ -11,7 +11,8 @@ export default function Onboarding() {
 
   function finish() {
     localStorage.setItem("sm_onboarded", "1");
-    navigate("/login", { replace: true });
+    // Entrada como invitado: se navega libre, el login se pide al contactar
+    navigate("/home", { replace: true });
   }
 
   const slides: { eyebrow: string; title: string; copy: string; art: ReactNode }[] = [

@@ -49,22 +49,38 @@ export default function Home() {
   return (
     <MobileScreen>
       <div style={{ position: "absolute", inset: 0, background: t.bg, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {/* header saludo */}
+        {/* header saludo (con sesión) o invitación a ingresar (invitado) */}
         <div style={{ padding: "54px 20px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => navigate("/settings")} style={{ all: "unset", cursor: "pointer", display: "flex" }}>
-            <Avatar initials={(user?.name ?? "U").charAt(0).toUpperCase()} hue={t.green} size={40} src={user?.avatar_url} />
-          </button>
-          <button onClick={() => navigate("/settings")} style={{ all: "unset", cursor: "pointer", flex: 1, minWidth: 0, textAlign: "left" }}>
-            <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute, letterSpacing: "0.04em" }}>Hola {firstName},</div>
-            <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700, color: t.ink, display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
-              <Icon name="pin-fill" size={13} color={t.green} />
-              {user?.city || "Argentina"}
-            </div>
-          </button>
-          <button onClick={() => navigate("/notifications")} style={{ all: "unset", cursor: "pointer", position: "relative", width: 42, height: 42, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icon name="bell" size={20} color={t.ink} />
-            {unread > 0 && <span style={{ position: "absolute", top: 9, right: 10, width: 8, height: 8, background: t.green, borderRadius: 999, border: `2px solid ${t.surface}` }} />}
-          </button>
+          {user ? (
+            <>
+              <button onClick={() => navigate("/settings")} style={{ all: "unset", cursor: "pointer", display: "flex" }}>
+                <Avatar initials={(user.name ?? "U").charAt(0).toUpperCase()} hue={t.green} size={40} src={user.avatar_url} />
+              </button>
+              <button onClick={() => navigate("/settings")} style={{ all: "unset", cursor: "pointer", flex: 1, minWidth: 0, textAlign: "left" }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute, letterSpacing: "0.04em" }}>Hola {firstName},</div>
+                <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700, color: t.ink, display: "flex", alignItems: "center", gap: 4, marginTop: 1 }}>
+                  <Icon name="pin-fill" size={13} color={t.green} />
+                  {user.city || "Argentina"}
+                </div>
+              </button>
+              <button onClick={() => navigate("/notifications")} style={{ all: "unset", cursor: "pointer", position: "relative", width: 42, height: 42, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon name="bell" size={20} color={t.ink} />
+                {unread > 0 && <span style={{ position: "absolute", top: 9, right: 10, width: 8, height: 8, background: t.green, borderRadius: 999, border: `2px solid ${t.surface}` }} />}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute, letterSpacing: "0.04em" }}>Bienvenido a</div>
+                <div style={{ fontFamily: t.fontDisplay, fontSize: 19, fontWeight: 700, color: t.ink, marginTop: 1 }}>
+                  Servi<span style={{ color: t.green }}>Market</span>
+                </div>
+              </div>
+              <button onClick={() => navigate("/login")} style={{ all: "unset", cursor: "pointer", padding: "10px 20px", borderRadius: 999, background: t.ink, fontFamily: t.fontBody, fontSize: 13.5, fontWeight: 700, color: "#fff" }}>
+                Ingresar
+              </button>
+            </>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", paddingBottom: 100 }}>

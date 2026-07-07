@@ -13,7 +13,8 @@ export default function Splash() {
       if (loading) return;
       if (user) navigate("/home", { replace: true });
       else if (!localStorage.getItem("sm_onboarded")) navigate("/onboarding", { replace: true });
-      else navigate("/login", { replace: true });
+      // Sin cuenta también se puede navegar: el login se pide recién al contactar
+      else navigate("/home", { replace: true });
     }, 1800);
     return () => clearTimeout(id);
   }, [user, loading, navigate]);

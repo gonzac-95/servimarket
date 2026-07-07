@@ -78,8 +78,24 @@ export default function ProviderProfile() {
   });
 
   function requestQuote() {
-    if (user?.role !== "client") { toast("Iniciá sesión como cliente para pedir presupuesto", "close"); return; }
+    // Invitado: acá recién se le pide crear cuenta, y vuelve directo al pedido
+    if (!user) {
+      toast("Creá tu cuenta para contactar al prestador", "user");
+      navigate(`/login?redirect=${encodeURIComponent(`/jobs/new?provider=${id}`)}`);
+      return;
+    }
+    if (user.role !== "client") { toast("Los prestadores no pueden pedir presupuestos", "close"); return; }
     navigate(`/jobs/new?provider=${id}`);
+  }
+
+  function handleFavorite() {
+    if (!user) {
+      toast("Ingresá para guardar favoritos", "heart-fill");
+      navigate(`/login?redirect=${encodeURIComponent(`/provider/${id}`)}`);
+      return;
+    }
+    toggleFavorite(provider.id);
+    toast(fav ? "Quitado de favoritos" : "Guardado en favoritos", "heart-fill");
   }
 
   return (
@@ -89,7 +105,7 @@ export default function ProviderProfile() {
         <div style={{ background: t.surfaceDeep, padding: "54px 16px 28px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", right: -60, top: -40, width: 220, height: 220, borderRadius: 999, background: `radial-gradient(circle, ${shade(hue, 10)}55, transparent 70%)` }} />
           <TopBar title="" onBack={() => navigate(-1)} transparent dark right={
-            <button onClick={() => { toggleFavorite(provider.id); toast(fav ? "Quitado de favoritos" : "Guardado en favoritos", "heart-fill"); }} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button onClick={handleFavorite} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name={fav ? "heart-fill" : "heart"} size={18} color={fav ? "#FF5A5A" : "#fff"} />
             </button>
           } />

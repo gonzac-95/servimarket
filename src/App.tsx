@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { Toaster } from './components/ui/toaster';
 import { ThemeProvider } from './lib/theme';
@@ -36,8 +36,10 @@ function ProtectedRoute({ children, adminOnly = false }: {
   adminOnly?: boolean;
 }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
-  if (!user) return <Navigate to="/login" replace />;
+  // Invitado: al login, recordando a dónde quería ir para volver después
+  if (!user) return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   if (adminOnly && user.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
@@ -62,9 +64,9 @@ export default function App() {
             <Route path="/help" element={<Help />} />
             <Route path="/search" element={<Search />} />
             <Route path="/provider/:id" element={<ProviderProfile />} />
+            <Route path="/home" element={<Home />} />
 
             {/* Protegidas */}
-            <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/provider" element={<ProtectedRoute><ProviderHome /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
