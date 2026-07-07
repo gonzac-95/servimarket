@@ -8,13 +8,14 @@ import { Avatar } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 
-interface Earnings { thisMonth: number; jobsThisMonth: number; pendingPayout: number; commission: number; }
+type Period = "month" | "year" | "all";
 
 export default function ProviderHome() {
   const t = useTheme();
   const { user, provider } = useAuth();
   const navigate = useNavigate();
-  const [earn, setEarn] = useState<Earnings>({ thisMonth: 0, jobsThisMonth: 0, pendingPayout: 0, commission: 0 });
+  const [payments, setPayments] = useState<any[]>([]);
+  const [period, setPeriod] = useState<Period>("month");
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,18 +25,10 @@ export default function ProviderHome() {
       // Ganancias reales: pagos aprobados de trabajos de este prestador
       const { data: pays } = await supabase
         .from("payments")
-        .select("provider_share, platform_fee, status, created_at, jobs!inner(provider_id)")
+        .select("provider_share, status, created_at, jobs!inner(provider_id)")
         .eq("jobs.provider_id", provider!.id)
         .eq("status", "approved");
-      const now = new Date();
-      let month = 0, jobs = 0, commission = 0;
-      (pays ?? []).forEach((p: any) => {
-        const d = new Date(p.created_at);
-        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-          month += Number(p.provider_share ?? 0); jobs += 1; commission += Number(p.platform_fee ?? 0);
-        }
-      });
-      setEarn({ thisMonth: month, jobsThisMonth: jobs, pendingPayout: month, commission });
+      setPayments(pays ?? []);
 
       // Solicitudes pendientes dirigidas a este prestador
       const { data: reqs } = await supabase
@@ -48,6 +41,18 @@ export default function ProviderHome() {
     }
     load();
   }, [provider?.id]);
+
+  // Ganancias del período elegido (mes actual, año actual o histórico)
+  const now = new Date();
+  const inPeriod = payments.filter((p: any) => {
+    const d = new Date(p.created_at);
+    if (period === "month") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (period === "year") return d.getFullYear() === now.getFullYear();
+    return true;
+  });
+  const earnTotal = inPeriod.reduce((s: number, p: any) => s + Number(p.provider_share ?? 0), 0);
+  const earnJobs = inPeriod.length;
+  const periodLabel = period === "month" ? "Ganancias del mes" : period === "year" ? `Ganancias ${now.getFullYear()}` : "Ganancias históricas";
 
   const initials = (user?.name ?? "P").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 
@@ -78,23 +83,32 @@ export default function ProviderHome() {
             </div>
           )}
 
-          {/* Ganancias del mes */}
+          {/* Ganancias (mes / año / histórico) */}
           <div style={{ padding: "0 20px 20px" }}>
             <div style={{ padding: 22, background: t.surfaceDeep, color: "#fff", borderRadius: t.radiusLg, position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", right: -40, top: -30, width: 220, height: 220, borderRadius: 999, background: `radial-gradient(circle, ${t.greenBright}55, transparent 70%)` }} />
               <div style={{ position: "relative", zIndex: 1 }}>
-                <span style={{ fontFamily: t.fontMono, fontSize: 10.5, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.18em", fontWeight: 600 }}>Ganancias del mes</span>
-                <div style={{ fontFamily: t.fontDisplay, fontSize: 44, fontWeight: 700, marginTop: 4, letterSpacing: "-0.025em", lineHeight: 1 }}>{fmtARS(earn.thisMonth)}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <span style={{ fontFamily: t.fontMono, fontSize: 10.5, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.18em", fontWeight: 600 }}>{periodLabel}</span>
+                  {/* selector de período */}
+                  <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.08)", borderRadius: 999, padding: 3 }}>
+                    {([["month", "Mes"], ["year", "Año"], ["all", "Total"]] as [Period, string][]).map(([id, label]) => (
+                      <button key={id} onClick={() => setPeriod(id)} style={{
+                        all: "unset", cursor: "pointer", padding: "4px 10px", borderRadius: 999,
+                        fontFamily: t.fontBody, fontSize: 11, fontWeight: 700,
+                        background: period === id ? "rgba(255,255,255,0.92)" : "transparent",
+                        color: period === id ? t.ink : "rgba(255,255,255,0.65)",
+                      }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ fontFamily: t.fontDisplay, fontSize: 44, fontWeight: 700, marginTop: 8, letterSpacing: "-0.025em", lineHeight: 1 }}>{fmtARS(earnTotal)}</div>
                 <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.12)", display: "flex", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Trabajos</div>
-                    <div style={{ fontFamily: t.fontBody, fontSize: 16, fontWeight: 700, marginTop: 4 }}>{earn.jobsThisMonth}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Trabajos cobrados</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 16, fontWeight: 700, marginTop: 4 }}>{earnJobs}</div>
                   </div>
-                  <div>
-                    <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Comisión</div>
-                    <div style={{ fontFamily: t.fontBody, fontSize: 16, fontWeight: 700, marginTop: 4 }}>{fmtARS(earn.commission)}</div>
-                  </div>
-                  <div>
+                  <div style={{ textAlign: "right" }}>
                     <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Rating</div>
                     <div style={{ fontFamily: t.fontBody, fontSize: 16, fontWeight: 700, marginTop: 4 }}>{(provider?.rating_avg ?? 0).toFixed(1)}</div>
                   </div>
