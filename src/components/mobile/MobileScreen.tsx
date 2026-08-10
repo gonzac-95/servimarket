@@ -18,7 +18,7 @@ export function MobileScreen({ children }: { children: ReactNode }) {
 
 // Barra de tabs inferior conectada a react-router.
 const CLIENT_ROUTES: Record<string, string> = { home: "/home", search: "/search", jobs: "/dashboard", profile: "/settings" };
-const PROVIDER_ROUTES: Record<string, string> = { home: "/provider", inbox: "/dashboard", jobs: "/dashboard", profile: "/settings" };
+const PROVIDER_ROUTES: Record<string, string> = { home: "/provider", inbox: "/inbox", jobs: "/dashboard", profile: "/settings" };
 
 export function TabBar({ active, role = "client" }: { active: string; role?: "client" | "provider" }) {
   const navigate = useNavigate();
@@ -31,6 +31,7 @@ export function useActiveTab(): string {
   const { pathname } = useLocation();
   if (pathname.startsWith("/home")) return "home";
   if (pathname.startsWith("/search")) return "search";
+  if (pathname.startsWith("/inbox")) return "inbox";
   if (pathname.startsWith("/dashboard")) return "jobs";
   if (pathname.startsWith("/settings")) return "profile";
   return "home";

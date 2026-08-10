@@ -179,6 +179,15 @@ export default function JobDetail() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
+  // Al abrir el chat, los mensajes recibidos quedan leídos (baja el contador de la bandeja)
+  useEffect(() => {
+    if (!user) return;
+    const ids = messages.filter(m => !m.read && m.sender_id !== user.id).map(m => m.id);
+    if (ids.length === 0) return;
+    supabase.from("messages").update({ read: true }).in("id", ids)
+      .then(() => setMessages(prev => prev.map(m => ids.includes(m.id) ? { ...m, read: true } : m)));
+  }, [messages, user]);
+
   useEffect(() => {
     const r = searchParams.get("payment");
     if (!r) return;

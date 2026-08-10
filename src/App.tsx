@@ -24,6 +24,7 @@ import JobDetail from './pages/JobDetail';
 import Dashboard from './pages/Dashboard';
 import ProviderHome from './pages/ProviderHome';
 import Notifications from './pages/Notifications';
+import Inbox from './pages/Inbox';
 import Settings from './pages/Settings';
 import EditProfile from './pages/EditProfile';
 import Favorites from './pages/Favorites';
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/provider" element={<ProtectedRoute><ProviderHome /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
             <Route path="/jobs/new" element={<ProtectedRoute><JobCreate /></ProtectedRoute>} />
             <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
