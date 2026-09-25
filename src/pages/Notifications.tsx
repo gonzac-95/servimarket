@@ -7,6 +7,7 @@ import { toast } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
 import { TopBar } from "../components/mobile/kit";
 import { MobileScreen } from "../components/mobile/MobileScreen";
+import { NotificationSettings } from "../components/NotificationSettings";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -27,6 +28,7 @@ function iconFor(type: string | undefined, t: ReturnType<typeof useTheme>) {
     case "job_completed":
     case "job_cancelled": return { icon: "briefcase", bg: "rgba(232,168,43,0.14)", color: "#9B6B12" };
     case "review": return { icon: "star", bg: "rgba(232,168,43,0.14)", color: t.star };
+    case "verification": return { icon: "badge", bg: t.greenSoft, color: t.green };
     default: return { icon: "shield", bg: t.surfaceAlt, color: t.inkMute };
   }
 }
@@ -63,6 +65,7 @@ export default function Notifications() {
   function open(n: Notif) {
     const jobId = n.data?.job_id as string | undefined;
     if (jobId) navigate(`/jobs/${jobId}`);
+    else if (n.type === "verification") navigate("/verificacion");
   }
 
   const today = items.filter(n => isToday(n.created_at));
@@ -95,12 +98,16 @@ export default function Notifications() {
   return (
     <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
+        <div style={{ paddingTop: "calc(var(--sm-top, 54px) - 10px)" }}>
         <TopBar title="Notificaciones" onBack={() => navigate(-1)} right={
           items.some(n => !n.read)
             ? <button onClick={markAll} style={{ all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 13, fontWeight: 600, color: t.green }}>Marcar leídas</button>
             : undefined
         } />
+        </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 24px" }}>
+          <div style={{ fontFamily: t.fontBody, fontSize: 11, fontWeight: 700, color: t.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", padding: "8px 4px 8px" }}>Cómo te avisamos</div>
+          <NotificationSettings />
           {loading ? (
             <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div>
           ) : items.length === 0 ? (

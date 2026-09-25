@@ -9,6 +9,7 @@ import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 import { usePaymentsEnabled } from "../lib/features";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { PushPrompt } from "../components/NotificationSettings";
 
 type Period = "month" | "year" | "all";
 
@@ -119,6 +120,9 @@ export default function ProviderHome() {
               <Icon name="chevron-right" size={16} color="rgba(255,255,255,0.6)" />
             </div>
           )}
+
+          {/* Invitación a activar notificaciones del navegador */}
+          <PushPrompt style={{ margin: "0 20px 12px" }} message="Activá las notificaciones para enterarte de cada pedido al instante." />
 
           {/* Perfil incompleto */}
           {provider && (!provider.bio || provider.categories.length === 0) && (

@@ -7,6 +7,7 @@ export interface User {
   id: string; role: Role; name: string; email: string; phone?: string;
   avatar_url?: string; lat?: number; lng?: number; city?: string;
   province?: string; country: string; is_blocked: boolean; created_at: string;
+  email_notifications?: boolean;
 }
 export interface PriceItem { service: string; price: number; unit: string; }
 export interface Provider {
