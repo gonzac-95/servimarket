@@ -29,6 +29,7 @@ import Settings from './pages/Settings';
 import EditProfile from './pages/EditProfile';
 import Favorites from './pages/Favorites';
 import Admin from './pages/Admin';
+import Verification from './pages/Verification';
 import NotFound from './pages/NotFound';
 
 // Protected route wrapper
@@ -77,6 +78,7 @@ export default function App() {
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/settings/edit" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
+            <Route path="/verificacion" element={<ProtectedRoute><Verification /></ProtectedRoute>} />
 
             {/* Admin */}
             <Route path="/admin/*" element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />

@@ -32,13 +32,19 @@ export default function JobCreate() {
   useEffect(() => {
     if (providerId) {
       supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("id", providerId).single().then(({ data }) => {
+        // Sólo prestadores verificados reciben pedidos
+        if (data && !data.documents_verified) {
+          toast("Este prestador todavía está en verificación", "shield");
+          navigate(`/provider/${providerId}`, { replace: true });
+          return;
+        }
         setProvider(data);
         // si el prestador tiene una sola categoría del catálogo, se preselecciona
         const matches = CATEGORIES.filter(x => data?.categories?.includes(x.dbName));
         if (matches.length === 1) { setCatId(matches[0].id); setStep(1); }
       });
     }
-  }, [providerId]);
+  }, [providerId, navigate]);
 
   // en el paso de categoría solo se ofrecen las del prestador elegido
   const providerCats = provider
@@ -65,7 +71,10 @@ export default function JobCreate() {
       photos,
     }).select().single();
     setLoading(false);
-    if (error) { toast("Error al crear el pedido", "shield"); return; }
+    if (error) {
+      toast(error.message.includes("provider_not_verified") ? "Este prestador todavía está en verificación" : "Error al crear el pedido", "shield");
+      return;
+    }
     toast("¡Pedido publicado!", "check");
     navigate(`/jobs/${data.id}`);
   }

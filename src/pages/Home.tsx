@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { usePaymentsEnabled } from "../lib/features";
 import { useAuth } from "../lib/auth";
 import { useTheme, shade } from "../lib/theme";
 import type { Provider } from "../types";
@@ -11,6 +12,7 @@ import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 
 export default function Home() {
   const t = useTheme();
+  const { enabled: paymentsEnabled } = usePaymentsEnabled();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [top, setTop] = useState<Provider[]>([]);
@@ -27,11 +29,11 @@ export default function Home() {
       // Primero los mejores de la ciudad del usuario; si no hay, los de todo el país
       if (city) {
         const { data } = await supabase.from("providers").select("*, users!inner(id,name,avatar_url,city)")
-          .eq("is_available", true).ilike("users.city", city)
+          .eq("is_available", true).eq("documents_verified", true).ilike("users.city", city)
           .order("rating_avg", { ascending: false }).order("reviews_count", { ascending: false }).limit(8);
         if (data && data.length > 0) { setTop(data as unknown as Provider[]); return; }
       }
-      const { data } = await supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("is_available", true)
+      const { data } = await supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("is_available", true).eq("documents_verified", true)
         .order("rating_avg", { ascending: false }).order("reviews_count", { ascending: false }).limit(8);
       setTop((data as Provider[]) ?? []);
     }
@@ -133,7 +135,9 @@ export default function Home() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 14, color: t.ink }}>Cada calificación es real</div>
                 <div style={{ fontFamily: t.fontBody, fontSize: 12.5, color: t.inkMute, marginTop: 3, lineHeight: 1.45 }}>
-                  Solo podés dejar reseña si pagaste y confirmaste el trabajo dentro de la app.
+                  {paymentsEnabled
+                    ? "Solo podés dejar reseña si pagaste y confirmaste el trabajo dentro de la app."
+                    : "Solo se puede reseñar un trabajo pedido por ServiMarket y confirmado por las dos partes. Y todos los prestadores tienen el DNI verificado."}
                 </div>
               </div>
             </div>

@@ -81,3 +81,10 @@ design-handoff/
 
 # ===== Supabase CLI temp =====
 supabase/.temp/
+
+# ===== Documentos sueltos (pitch, notas con keys) =====
+*.docx
+*.pptx
+
+# ===== Restos de sesiones de Claude =====
+mnt/

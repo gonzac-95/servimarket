@@ -7,6 +7,7 @@ import { categoryByDbName } from "../lib/categories";
 import { Avatar } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
+import { usePaymentsEnabled } from "../lib/features";
 
 type Period = "month" | "year" | "all";
 
@@ -17,7 +18,10 @@ export default function ProviderHome() {
   const [payments, setPayments] = useState<any[]>([]);
   const [period, setPeriod] = useState<Period>("month");
   const [requests, setRequests] = useState<any[]>([]);
+  const [completed, setCompleted] = useState<any[]>([]);
+  const [docStatus, setDocStatus] = useState<"none" | "pending" | "rejected">("none");
   const [loading, setLoading] = useState(true);
+  const { enabled: paymentsEnabled } = usePaymentsEnabled();
 
   useEffect(() => {
     if (!provider?.id) { setLoading(false); return; }
@@ -37,10 +41,24 @@ export default function ProviderHome() {
         .eq("provider_id", provider!.id).eq("status", "pending")
         .order("created_at", { ascending: false });
       setRequests(reqs ?? []);
+
+      // Trabajos cerrados (se usan como métrica cuando no hay cobro in-app)
+      const { data: done } = await supabase
+        .from("jobs").select("id, updated_at, client_confirmed_at")
+        .eq("provider_id", provider!.id).eq("status", "completed");
+      setCompleted(done ?? []);
+
+      // Estado del DNI para el aviso de verificación
+      if (!provider!.documents_verified) {
+        const { data: docs } = await supabase.from("verification_documents")
+          .select("status").eq("provider_id", provider!.id).eq("document_type", "dni");
+        const st = (docs ?? []).map((d: any) => d.status);
+        setDocStatus(st.includes("pending") ? "pending" : st.includes("rejected") ? "rejected" : "none");
+      }
       setLoading(false);
     }
     load();
-  }, [provider?.id]);
+  }, [provider?.id, provider?.documents_verified]);
 
   // Ganancias del período elegido (mes actual, año actual o histórico)
   const now = new Date();
@@ -50,9 +68,17 @@ export default function ProviderHome() {
     if (period === "year") return d.getFullYear() === now.getFullYear();
     return true;
   });
+  const doneInPeriod = completed.filter((j: any) => {
+    const d = new Date(j.client_confirmed_at ?? j.updated_at);
+    if (period === "month") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (period === "year") return d.getFullYear() === now.getFullYear();
+    return true;
+  }).length;
   const earnTotal = inPeriod.reduce((s: number, p: any) => s + Number(p.provider_share ?? 0), 0);
   const earnJobs = inPeriod.length;
-  const periodLabel = period === "month" ? "Ganancias del mes" : period === "year" ? `Ganancias ${now.getFullYear()}` : "Ganancias históricas";
+  const periodLabel = paymentsEnabled
+    ? (period === "month" ? "Ganancias del mes" : period === "year" ? `Ganancias ${now.getFullYear()}` : "Ganancias históricas")
+    : (period === "month" ? "Trabajos del mes" : period === "year" ? `Trabajos ${now.getFullYear()}` : "Trabajos totales");
 
   const initials = (user?.name ?? "P").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 
@@ -71,6 +97,24 @@ export default function ProviderHome() {
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 100px" }}>
+          {/* Verificación de identidad */}
+          {provider && !provider.documents_verified && (
+            <div onClick={() => navigate("/verificacion")} style={{ margin: "0 20px 12px", padding: 16, background: t.surfaceDeep, color: "#fff", borderRadius: t.radius, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,0.10)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon name={docStatus === "pending" ? "clock" : "shield"} size={20} color={docStatus === "pending" ? "#E8A82B" : t.greenBright} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 14, fontWeight: 700 }}>
+                  {docStatus === "pending" ? "Estamos revisando tu DNI" : docStatus === "rejected" ? "Tu DNI fue rechazado" : "Verificá tu identidad"}
+                </div>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, opacity: 0.7, marginTop: 2, lineHeight: 1.4 }}>
+                  {docStatus === "pending" ? "Te avisamos cuando esté aprobado. Mientras tanto no aparecés en búsquedas." : docStatus === "rejected" ? "Revisá el motivo y volvé a subirlo." : "Subí tu DNI para aparecer en las búsquedas y recibir pedidos."}
+                </div>
+              </div>
+              <Icon name="chevron-right" size={16} color="rgba(255,255,255,0.6)" />
+            </div>
+          )}
+
           {/* Perfil incompleto */}
           {provider && (!provider.bio || provider.categories.length === 0) && (
             <div style={{ margin: "0 20px 16px", padding: 14, background: "rgba(232,168,43,0.10)", border: "1px solid rgba(232,168,43,0.30)", borderRadius: t.radius, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => navigate("/settings/edit")}>
@@ -102,11 +146,11 @@ export default function ProviderHome() {
                     ))}
                   </div>
                 </div>
-                <div style={{ fontFamily: t.fontDisplay, fontSize: 44, fontWeight: 700, marginTop: 8, letterSpacing: "-0.025em", lineHeight: 1 }}>{fmtARS(earnTotal)}</div>
+                <div style={{ fontFamily: t.fontDisplay, fontSize: 44, fontWeight: 700, marginTop: 8, letterSpacing: "-0.025em", lineHeight: 1 }}>{paymentsEnabled ? fmtARS(earnTotal) : doneInPeriod}</div>
                 <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.12)", display: "flex", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Trabajos cobrados</div>
-                    <div style={{ fontFamily: t.fontBody, fontSize: 16, fontWeight: 700, marginTop: 4 }}>{earnJobs}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{paymentsEnabled ? "Trabajos cobrados" : "Solicitudes nuevas"}</div>
+                    <div style={{ fontFamily: t.fontBody, fontSize: 16, fontWeight: 700, marginTop: 4 }}>{paymentsEnabled ? earnJobs : requests.length}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontFamily: t.fontBody, fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Rating</div>

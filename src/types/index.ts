@@ -13,6 +13,7 @@ export interface Provider {
   id: string; user_id: string; categories: string[]; bio?: string;
   price_list: PriceItem[]; photos: string[]; service_radius_km: number;
   service_zones: string[]; documents_verified: boolean; cuit_cuil?: string;
+  dni_verified?: boolean; background_check?: boolean; license_verified?: boolean; license_number?: string | null;
   rating_avg: number; reviews_count: number; is_available: boolean;
   mp_user_id?: string | null; mp_connected_at?: string | null;
   created_at: string; users?: User;

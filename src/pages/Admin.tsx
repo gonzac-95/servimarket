@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { useToast } from '../components/ui/use-toast';
-import { Users, Briefcase, CreditCard, Shield, Home, Search, CheckCircle, XCircle, Loader2, Wallet, Plus, Trash2, Save } from 'lucide-react';
+import { Users, Briefcase, CreditCard, Shield, Home, Search, CheckCircle, XCircle, Loader2, Wallet, Plus, Trash2, Save, FileCheck, Eye, BadgeCheck } from 'lucide-react';
+import { Switch } from '../components/ui/switch';
+import { resetFeatureCache } from '../lib/features';
 import { calculateCommission, formatARS, type CommissionTier } from '../lib/commission';
 
 function StatCard({ icon: Icon, label, value, color }: any) {
@@ -88,9 +90,11 @@ function AdminUsers() {
 }
 
 // ---- Providers Admin ----
+// La verificación ya no se togglea a mano: surge de los documentos aprobados
+// (DNI aprobado = aparece en búsquedas). Se revisa en "Verificaciones".
 function AdminProviders() {
-  const { toast } = useToast();
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [filter, setFilter] = useState<'all' | 'verified' | 'unverified'>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -98,34 +102,134 @@ function AdminProviders() {
       .then(({ data }) => { setProviders(data as Provider[] ?? []); setLoading(false); });
   }, []);
 
-  async function verify(provider: Provider) {
-    await supabase.from('providers').update({ documents_verified: !provider.documents_verified }).eq('id', provider.id);
-    setProviders(prev => prev.map(p => p.id === provider.id ? { ...p, documents_verified: !p.documents_verified } : p));
-    toast({ title: provider.documents_verified ? 'Verificación removida' : '¡Prestador verificado!' });
+  const shown = providers.filter(p => filter === 'all' || (filter === 'verified' ? p.documents_verified : !p.documents_verified));
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        {([['all', 'Todos'], ['verified', 'Verificados'], ['unverified', 'Sin verificar']] as const).map(([id, label]) => (
+          <Button key={id} size="sm" variant={filter === id ? 'default' : 'outline'} onClick={() => setFilter(id)}>{label}</Button>
+        ))}
+      </div>
+      {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+        <div className="divide-y border rounded-xl overflow-hidden bg-card">
+          {shown.map(p => (
+            <div key={p.id} className="flex items-center justify-between p-4 gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-sm">{p.users?.name} <span className="text-xs text-muted-foreground font-normal">· {p.users?.city ?? 'sin ciudad'}</span></div>
+                <div className="text-xs text-muted-foreground">{p.categories.join(', ') || 'Sin categorías'}</div>
+                <div className="flex flex-wrap gap-1.5 mt-1 items-center">
+                  {p.documents_verified
+                    ? <Badge className="text-xs bg-emerald-100 text-emerald-700">Visible</Badge>
+                    : <Badge variant="outline" className="text-xs">Oculto</Badge>}
+                  {p.dni_verified && <Badge className="text-xs bg-emerald-50 text-emerald-700">DNI</Badge>}
+                  {p.background_check && <Badge className="text-xs bg-emerald-50 text-emerald-700">Antecedentes</Badge>}
+                  {p.license_verified && <Badge className="text-xs bg-emerald-50 text-emerald-700">Matrícula</Badge>}
+                  <span className="text-xs text-muted-foreground">★ {Number(p.rating_avg ?? 0).toFixed(1)} ({p.reviews_count})</span>
+                </div>
+              </div>
+              <Link to={`/provider/${p.id}`}><Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button></Link>
+            </div>
+          ))}
+          {shown.length === 0 && <div className="p-6 text-sm text-center text-muted-foreground">No hay prestadores en este filtro.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Verificación de documentos ----
+const DOC_LABEL: Record<string, string> = { dni: 'DNI', background_check: 'Antecedentes', license: 'Matrícula' };
+
+function AdminVerification() {
+  const { toast } = useToast();
+  const [docs, setDocs] = useState<any[]>([]);
+  const [status, setStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase.from('verification_documents')
+      .select('*, providers(id, categories, users(id,name,city))')
+      .eq('status', status).order('uploaded_at', { ascending: true }).limit(100);
+    setDocs(data ?? []);
+    setLoading(false);
+  }
+  useEffect(() => { load(); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function open(doc: any) {
+    const { data } = await supabase.storage.from('verification-documents').createSignedUrl(doc.file_url, 120);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    else toast({ title: 'No se pudo abrir el archivo', variant: 'destructive' });
+  }
+
+  async function review(doc: any, next: 'approved' | 'rejected', reasonOverride?: string) {
+    const why = (reasonOverride ?? reason).trim();
+    if (next === 'rejected' && !why) { toast({ title: 'Indicá el motivo del rechazo', variant: 'destructive' }); return; }
+    setBusy(doc.id);
+    const { error } = await supabase.from('verification_documents')
+      .update({ status: next, rejection_reason: next === 'rejected' ? why : null })
+      .eq('id', doc.id);
+    setBusy(null);
+    if (error) { toast({ title: 'Error al guardar', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: next === 'approved' ? 'Documento aprobado' : 'Documento rechazado', description: 'El prestador recibe una notificación.' });
+    setRejecting(null); setReason('');
+    setDocs(prev => prev.filter(d => d.id !== doc.id));
   }
 
   return (
     <div>
-      {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+      <div className="flex gap-2 mb-4">
+        {([['pending', 'Pendientes'], ['approved', 'Aprobados'], ['rejected', 'Rechazados']] as const).map(([id, label]) => (
+          <Button key={id} size="sm" variant={status === id ? 'default' : 'outline'} onClick={() => setStatus(id)}>{label}</Button>
+        ))}
+      </div>
+      {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : docs.length === 0 ? (
+        <div className="p-6 text-sm text-center text-muted-foreground border rounded-xl bg-card">
+          {status === 'pending' ? 'No hay documentos esperando revisión.' : 'Sin documentos en este estado.'}
+        </div>
+      ) : (
         <div className="divide-y border rounded-xl overflow-hidden bg-card">
-          {providers.map(p => (
-            <div key={p.id} className="flex items-center justify-between p-4">
-              <div>
-                <div className="font-medium text-sm">{p.users?.name}</div>
-                <div className="text-xs text-muted-foreground">{p.categories.join(', ')}</div>
-                <div className="flex gap-1.5 mt-1">
-                  {p.documents_verified && <Badge className="text-xs bg-emerald-100 text-emerald-700">Verificado</Badge>}
-                  <span className="text-xs text-muted-foreground">★ {p.rating_avg.toFixed(1)} ({p.reviews_count})</span>
+          {docs.map(d => (
+            <div key={d.id} className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">{DOC_LABEL[d.document_type] ?? d.document_type}</Badge>
+                    <span className="font-medium text-sm">{d.providers?.users?.name ?? 'Prestador'}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {(d.providers?.categories ?? []).join(', ') || 'Sin categorías'} · {d.providers?.users?.city ?? 'sin ciudad'} · {new Date(d.uploaded_at).toLocaleString('es-AR')}
+                  </div>
+                  {d.rejection_reason && <div className="text-xs text-red-600 mt-1">Motivo: {d.rejection_reason}</div>}
                 </div>
+                <Button variant="outline" size="sm" onClick={() => open(d)}><Eye className="h-4 w-4 mr-1" />Ver</Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => verify(p)}
-                className={p.documents_verified ? 'text-red-600' : 'text-emerald-600'}
-              >
-                {p.documents_verified ? 'Quitar verificación' : '✓ Verificar'}
-              </Button>
+              {status === 'pending' && (rejecting === d.id ? (
+                <div className="flex gap-2">
+                  <Input placeholder="Motivo (ej: la foto no se lee)" value={reason} onChange={e => setReason(e.target.value)} />
+                  <Button size="sm" variant="outline" className="text-red-600" disabled={busy === d.id} onClick={() => review(d, 'rejected')}>Rechazar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(''); }}>Cancelar</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={busy === d.id} onClick={() => review(d, 'approved')}>
+                    <CheckCircle className="h-4 w-4 mr-1" />Aprobar
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => { setRejecting(d.id); setReason(''); }}>
+                    <XCircle className="h-4 w-4 mr-1" />Rechazar
+                  </Button>
+                </div>
+              ))}
+              {status === 'approved' && (
+                <Button size="sm" variant="ghost" className="text-red-600" disabled={busy === d.id}
+                  onClick={() => review(d, 'rejected', 'aprobación revocada por el equipo')}>
+                  Revocar aprobación
+                </Button>
+              )}
             </div>
           ))}
         </div>
@@ -240,6 +344,18 @@ function AdminCommission() {
     else toast({ title: 'Tramos actualizados', description: 'Aplicará a los nuevos pagos' });
   }
 
+  const [paymentsOn, setPaymentsOn] = useState(false);
+  useEffect(() => {
+    supabase.from('app_config').select('value').eq('key', 'payments_enabled').maybeSingle()
+      .then(({ data }) => setPaymentsOn(data?.value === true));
+  }, []);
+  async function togglePayments(next: boolean) {
+    const { error } = await supabase.from('app_config').upsert({ key: 'payments_enabled', value: next });
+    if (error) { toast({ title: 'Error al guardar', description: error.message, variant: 'destructive' }); return; }
+    setPaymentsOn(next); resetFeatureCache();
+    toast({ title: next ? 'Cobro in-app activado' : 'Cobro in-app desactivado' });
+  }
+
   const previewAmount = parseFloat(preview) || 0;
   const previewBreakdown = calculateCommission(previewAmount, tiers);
 
@@ -247,6 +363,18 @@ function AdminCommission() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardContent className="p-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="font-semibold text-sm">Cobro in-app con MercadoPago</div>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Apagado: cliente y prestador arreglan el pago entre ellos, no se muestra comisión y la reseña sólo exige
+              la doble confirmación. Activalo cuando tengas CUIT y credenciales productivas de MercadoPago.
+            </p>
+          </div>
+          <Switch checked={paymentsOn} onCheckedChange={togglePayments} />
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -346,7 +474,7 @@ function AdminCommission() {
 export default function Admin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [stats, setStats] = useState({ users: 0, jobs: 0, payments: 0, providers: 0 });
+  const [stats, setStats] = useState({ users: 0, jobs: 0, payments: 0, providers: 0, verified: 0, pendingDocs: 0 });
 
   useEffect(() => {
     Promise.all([
@@ -354,15 +482,19 @@ export default function Admin() {
       supabase.from('jobs').select('id', { count: 'exact', head: true }),
       supabase.from('payments').select('id', { count: 'exact', head: true }),
       supabase.from('providers').select('id', { count: 'exact', head: true }),
-    ]).then(([u, j, p, pr]) => setStats({
+      supabase.from('providers').select('id', { count: 'exact', head: true }).eq('documents_verified', true),
+      supabase.from('verification_documents').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    ]).then(([u, j, p, pr, v, pd]) => setStats({
       users: u.count ?? 0, jobs: j.count ?? 0,
       payments: p.count ?? 0, providers: pr.count ?? 0,
+      verified: v.count ?? 0, pendingDocs: pd.count ?? 0,
     }));
   }, []);
 
   const navItems = [
     { path: '/admin', label: 'Inicio', icon: Home },
     { path: '/admin/users', label: 'Usuarios', icon: Users },
+    { path: '/admin/verification', label: `Verificaciones${stats.pendingDocs ? ` (${stats.pendingDocs})` : ''}`, icon: FileCheck },
     { path: '/admin/providers', label: 'Prestadores', icon: Shield },
     { path: '/admin/jobs', label: 'Trabajos', icon: Briefcase },
     { path: '/admin/commission', label: 'Comisiones', icon: Wallet },
@@ -373,7 +505,7 @@ export default function Admin() {
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="container flex items-center justify-between h-16">
           <span className="font-bold text-primary">ServiMarket Admin</span>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>← App</Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/home')}>← App</Button>
         </div>
       </header>
       <div className="container py-6 max-w-4xl">
@@ -397,10 +529,13 @@ export default function Admin() {
                 <StatCard icon={Shield} label="Prestadores" value={stats.providers} color="bg-emerald-500" />
                 <StatCard icon={Briefcase} label="Trabajos" value={stats.jobs} color="bg-purple-500" />
                 <StatCard icon={CreditCard} label="Pagos" value={stats.payments} color="bg-orange-500" />
+                <StatCard icon={BadgeCheck} label="Prestadores visibles" value={stats.verified} color="bg-teal-600" />
+                <StatCard icon={FileCheck} label="Docs. por revisar" value={stats.pendingDocs} color="bg-amber-500" />
               </div>
             </div>
           } />
           <Route path="/users" element={<><h2 className="text-xl font-bold mb-6">Usuarios</h2><AdminUsers /></>} />
+          <Route path="/verification" element={<><h2 className="text-xl font-bold mb-6">Verificaciones</h2><AdminVerification /></>} />
           <Route path="/providers" element={<><h2 className="text-xl font-bold mb-6">Prestadores</h2><AdminProviders /></>} />
           <Route path="/jobs" element={<><h2 className="text-xl font-bold mb-6">Trabajos</h2><AdminJobs /></>} />
           <Route path="/commission" element={<><h2 className="text-xl font-bold mb-6">Comisiones</h2><AdminCommission /></>} />

@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { Button, Logo } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
+import { usePaymentsEnabled } from "../lib/features";
 
 export default function Onboarding() {
   const t = useTheme();
   const navigate = useNavigate();
   const [idx, setIdx] = useState(0);
+  const { enabled: paymentsEnabled } = usePaymentsEnabled();
 
   function finish() {
     localStorage.setItem("sm_onboarded", "1");
@@ -36,6 +38,7 @@ export default function Onboarding() {
         </div>
       ),
     },
+    ...(paymentsEnabled ? [
     {
       eyebrow: "Tranquilo",
       title: "Pagás dentro\nde la app",
@@ -65,6 +68,42 @@ export default function Onboarding() {
         </div>
       ),
     },
+    ] : [
+    {
+      eyebrow: "Tranquilo",
+      title: "Prestadores\nverificados",
+      copy: "Validamos el DNI de cada prestador antes de mostrarlo. Confirmás cuando el trabajo está listo y cada calificación viene de un trabajo real.",
+      art: (
+        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <div style={{ position: "absolute", top: 40, left: 30, right: 30, padding: 20, background: t.surfaceDeep, borderRadius: 22, color: "#fff", fontFamily: t.fontBody }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <span style={{ fontSize: 11, opacity: 0.6, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>Identidad verificada</span>
+              <Icon name="shield" size={18} color={t.greenBright} />
+            </div>
+            <div style={{ fontFamily: t.fontDisplay, fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>Carlos R.</div>
+            <div style={{ fontSize: 12.5, opacity: 0.7, marginTop: 2 }}>Gasista matriculado</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+              {["DNI", "Antecedentes", "Matrícula"].map(b => (
+                <span key={b} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, background: "rgba(255,255,255,0.10)", fontSize: 11.5, fontWeight: 700 }}>
+                  <Icon name="check" size={12} color={t.greenBright} /> {b}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ position: "absolute", bottom: 30, left: 30, right: 30, padding: "14px 16px", background: t.surface, borderRadius: 16, boxShadow: t.shadow, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 999, background: t.greenSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="check" size={20} color={t.green} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 13, color: t.ink }}>Trabajo confirmado</div>
+              <div style={{ fontFamily: t.fontBody, fontSize: 11.5, color: t.inkMute, marginTop: 1 }}>Dejá tu calificación</div>
+            </div>
+            <Icon name="star" size={20} color={t.star} />
+          </div>
+        </div>
+      ),
+    },
+    ]),
   ];
 
   const slide = slides[idx];

@@ -3,40 +3,58 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../lib/theme";
 import { Icon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
+import { usePaymentsEnabled } from "../lib/features";
+import { SUPPORT_EMAIL, whatsappLink } from "../lib/support";
 
-const FAQS: { q: string; a: string }[] = [
-  {
-    q: "¿Cómo pido un servicio?",
-    a: "Buscá un prestador por categoría o nombre, entrá a su perfil y tocá \"Pedir presupuesto\". Contale qué necesitás (con fotos si podés) y te responde con una cotización dentro de la app.",
-  },
-  {
-    q: "¿Cómo y cuándo pago?",
-    a: "El pago se hace con MercadoPago dentro de la app, una vez que aceptaste la cotización. Confirmás el trabajo cuando está terminado a tu satisfacción. Nunca pagues por afuera: el pago por la app es tu respaldo.",
-  },
-  {
-    q: "¿Las reseñas son reales?",
-    a: "Sí. Solo puede dejar reseña un cliente que pagó y confirmó el trabajo dentro de ServiMarket. No hay reseñas inventadas.",
-  },
-  {
-    q: "¿Qué pasa si el trabajo sale mal?",
-    a: "Antes de confirmar, usá el botón \"Algo no está bien\" en el chat del trabajo para resolverlo con el prestador. Si no llegan a un acuerdo, escribinos a soporte y mediamos.",
-  },
-  {
-    q: "¿Cómo me hago prestador?",
-    a: "Creá una cuenta eligiendo \"Soy prestador\" y completá tu perfil: categorías, zona, descripción y lista de precios. Cuanto más completo tu perfil, más clientes te encuentran.",
-  },
-  {
-    q: "¿Cuánto cobra ServiMarket?",
-    a: "Para el cliente el precio es el cotizado, sin recargos. Al prestador se le descuenta una comisión fija según el monto del trabajo, que ve claramente antes de cotizar.",
-  },
-  {
-    q: "¿Cómo elimino mi cuenta?",
-    a: "Desde Perfil → \"Eliminar mi cuenta\". Se borran tus datos personales de forma permanente. También podés pedirlo escribiendo a soporte.",
-  },
-];
+function buildFaqs(paymentsEnabled: boolean): { q: string; a: string }[] {
+  return [
+    {
+      q: "¿Cómo pido un servicio?",
+      a: "Buscá un prestador por categoría o nombre, entrá a su perfil y tocá \"Pedir presupuesto\". Contale qué necesitás (con fotos si podés) y te responde con una cotización dentro de la app.",
+    },
+    paymentsEnabled ? {
+      q: "¿Cómo y cuándo pago?",
+      a: "El pago se hace con MercadoPago dentro de la app, una vez que aceptaste la cotización. Confirmás el trabajo cuando está terminado a tu satisfacción. Nunca pagues por afuera: el pago por la app es tu respaldo.",
+    } : {
+      q: "¿Cómo y cuándo pago?",
+      a: "Por ahora el pago se arregla directamente con el prestador (efectivo, transferencia o el medio que acuerden). Te recomendamos pagar cuando el trabajo esté terminado y confirmarlo en la app para dejar tu reseña.",
+    },
+    {
+      q: "¿Los prestadores están verificados?",
+      a: "Sí. Sólo mostramos prestadores a los que les validamos el DNI. Además, algunos suman certificado de antecedentes y, en el caso de los gasistas, matrícula: lo vas a ver en su perfil.",
+    },
+    {
+      q: "¿Las reseñas son reales?",
+      a: paymentsEnabled
+        ? "Sí. Solo puede dejar reseña un cliente que pagó y confirmó el trabajo dentro de ServiMarket. No hay reseñas inventadas."
+        : "Sí. Solo puede dejar reseña el cliente que pidió el trabajo por ServiMarket, después de que el prestador lo marcó como terminado y el cliente lo confirmó.",
+    },
+    {
+      q: "¿Qué pasa si el trabajo sale mal?",
+      a: "Antes de confirmar, hablalo con el prestador por el chat del trabajo. Si no llegan a un acuerdo, escribinos por WhatsApp y te ayudamos.",
+    },
+    {
+      q: "¿Cómo me hago prestador?",
+      a: "Creá una cuenta eligiendo \"Soy prestador\", completá tu perfil (categorías, zona, descripción y precios) y subí tu DNI en Perfil → Verificación de identidad. Cuando lo aprobamos, empezás a aparecer en las búsquedas.",
+    },
+    paymentsEnabled ? {
+      q: "¿Cuánto cobra ServiMarket?",
+      a: "Para el cliente el precio es el cotizado, sin recargos. Al prestador se le descuenta una comisión fija según el monto del trabajo, que ve claramente antes de cotizar.",
+    } : {
+      q: "¿Cuánto cobra ServiMarket?",
+      a: "Nada. Durante el lanzamiento ServiMarket es gratis para clientes y prestadores. Si eso cambia, lo vamos a avisar con anticipación.",
+    },
+    {
+      q: "¿Cómo elimino mi cuenta?",
+      a: "Desde Perfil → \"Eliminar mi cuenta\". Se borran tus datos personales de forma permanente. También podés pedirlo escribiéndonos.",
+    },
+  ];
+}
 
 export default function Help() {
   const t = useTheme();
+  const { enabled: paymentsEnabled } = usePaymentsEnabled();
+  const FAQS = buildFaqs(paymentsEnabled);
   const navigate = useNavigate();
   const [open, setOpen] = useState<number | null>(null);
 
@@ -74,8 +92,11 @@ export default function Help() {
           <div style={{ marginTop: 20, padding: 18, background: t.surfaceDeep, borderRadius: t.radius, color: "#fff" }}>
             <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700 }}>¿No encontraste tu respuesta?</div>
             <div style={{ fontFamily: t.fontBody, fontSize: 12.5, opacity: 0.7, marginTop: 4, lineHeight: 1.5 }}>Escribinos y te respondemos lo antes posible.</div>
-            <a href="mailto:soporte@servimarket.app" style={{ textDecoration: "none", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 46, background: t.green, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>
-              <Icon name="chat" size={17} color="#fff" /> soporte@servimarket.app
+            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 46, background: t.green, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>
+              <Icon name="phone" size={17} color="#fff" /> Escribinos por WhatsApp
+            </a>
+            <a href={`mailto:${SUPPORT_EMAIL}`} style={{ textDecoration: "none", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: t.radiusSm, border: "1px solid rgba(255,255,255,0.18)", fontFamily: t.fontBody, fontSize: 13, fontWeight: 600, color: "#fff" }}>
+              <Icon name="chat" size={16} color="#fff" /> {SUPPORT_EMAIL}
             </a>
           </div>
         </div>

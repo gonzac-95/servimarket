@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import type { Job, Message, Payment } from "../types";
 import { calculateCommission, useCommissionTiers } from "../lib/commission";
+import { usePaymentsEnabled } from "../lib/features";
 import { useTheme, fmtARS } from "../lib/theme";
 import { categoryByDbName } from "../lib/categories";
 import { Avatar, Button, Field, toast } from "../components/mobile/kit";
@@ -152,6 +153,7 @@ export default function JobDetail() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const { tiers } = useCommissionTiers();
+  const { enabled: paymentsEnabled } = usePaymentsEnabled();
 
   const loadJob = useCallback(async () => {
     const { data } = await supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))").eq("id", id).single();
@@ -201,9 +203,12 @@ export default function JobDetail() {
       supabase.from("reviews").select("id").eq("job_id", id).maybeSingle().then(({ data }) => setHasReview(!!data));
   }, [job, id, user]);
   useEffect(() => {
-    if (job?.status === "completed")
+    if (job?.status === "completed" && paymentsEnabled)
       supabase.from("payments").select("id").eq("job_id", id).eq("status", "approved").maybeSingle().then(({ data }) => setPaymentApproved(!!data));
-  }, [job, id]);
+  }, [job, id, paymentsEnabled]);
+
+  // Con cobro in-app apagado, la reseña sólo exige la doble confirmación
+  const canReview = !paymentsEnabled || paymentApproved;
 
   async function sendMessage() {
     if (!text.trim() || !user) return;
@@ -373,11 +378,19 @@ export default function JobDetail() {
               </div>
             )}
 
-            {/* comisión */}
-            {job.price && job.price > 0 && job.status !== "cancelled" && <CommissionBreakdown amount={job.price} role={isProvider ? "provider" : "client"} />}
+            {/* comisión + pago in-app (sólo con cobro in-app activo) */}
+            {paymentsEnabled && job.price && job.price > 0 && job.status !== "cancelled" && <CommissionBreakdown amount={job.price} role={isProvider ? "provider" : "client"} />}
+            {paymentsEnabled && (isClient || isProvider) && job.status !== "pending" && job.status !== "cancelled" && <PaymentSection job={job} isClient={isClient} onPaymentChange={loadJob} />}
 
-            {/* pago */}
-            {(isClient || isProvider) && job.status !== "pending" && job.status !== "cancelled" && <PaymentSection job={job} isClient={isClient} onPaymentChange={loadJob} />}
+            {/* pago directo (lanzamiento sin cobro in-app) */}
+            {!paymentsEnabled && (isClient || isProvider) && (job.status === "accepted" || job.status === "in_progress") && (
+              <div style={{ background: t.greenSoft, border: `1px solid ${t.greenSoft}`, borderRadius: t.radius, padding: 14, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <Icon name="wallet" size={20} color={t.greenDeep} />
+                <div style={{ fontFamily: t.fontBody, fontSize: 12.5, color: t.greenDeep, lineHeight: 1.5 }}>
+                  <strong>El pago se arregla directo con {isClient ? "el prestador" : "el cliente"}.</strong> ServiMarket no cobra comisión durante el lanzamiento. Al terminar, confirmen el trabajo en la app para habilitar la reseña.
+                </div>
+              </div>
+            )}
 
             {/* acciones prestador: pending → cotizar + aceptar/rechazar */}
             {isProvider && job.status === "pending" && (
@@ -386,7 +399,7 @@ export default function JobDetail() {
                   <div style={{ fontFamily: t.fontBody, fontWeight: 700, fontSize: 14, color: t.ink }}>Enviar cotización</div>
                   <Field label="Monto (ARS)" value={quoteForm.amount} onChange={(v: string) => setQuoteForm(f => ({ ...f, amount: v }))} placeholder="Ej: 28500" type="number" />
                   <Field label="Descripción (opcional)" value={quoteForm.description} onChange={(v: string) => setQuoteForm(f => ({ ...f, description: v }))} placeholder="Qué incluye" />
-                  {parseFloat(quoteForm.amount) > 0 && (() => { const b = calculateCommission(parseFloat(quoteForm.amount), tiers); return <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute }}>Si la aceptan, cobrás <strong style={{ color: t.green }}>{fmtARS(b.providerNet)}</strong> (comisión {fmtARS(b.fee)})</div>; })()}
+                  {paymentsEnabled && parseFloat(quoteForm.amount) > 0 && (() => { const b = calculateCommission(parseFloat(quoteForm.amount), tiers); return <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute }}>Si la aceptan, cobrás <strong style={{ color: t.green }}>{fmtARS(b.providerNet)}</strong> (comisión {fmtARS(b.fee)})</div>; })()}
                   <Button variant="green" full disabled={!quoteForm.amount || sendingQuote} onClick={sendQuote}>Enviar cotización</Button>
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -423,10 +436,10 @@ export default function JobDetail() {
             )}
 
             {/* reseña */}
-            {isClient && job.status === "completed" && !hasReview && job.provider_id && paymentApproved && (
+            {isClient && job.status === "completed" && !hasReview && job.provider_id && canReview && (
               <ReviewCard jobId={job.id} providerId={job.provider_id} onDone={() => setHasReview(true)} />
             )}
-            {isClient && job.status === "completed" && !hasReview && !paymentApproved && (
+            {isClient && job.status === "completed" && !hasReview && !canReview && (
               <div style={{ background: "rgba(232,168,43,0.10)", border: "1px solid rgba(232,168,43,0.30)", borderRadius: t.radius, padding: 14, fontFamily: t.fontBody, fontSize: 12.5, color: "#9B6B12", lineHeight: 1.5 }}>
                 <strong>Reseña disponible tras el pago.</strong> Para calificar, el pago debe haberse hecho a través de ServiMarket. Así las reseñas provienen de trabajos reales.
               </div>

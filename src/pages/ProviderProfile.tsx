@@ -85,6 +85,7 @@ export default function ProviderProfile() {
       return;
     }
     if (user.role !== "client") { toast("Los prestadores no pueden pedir presupuestos", "close"); return; }
+    if (!provider.documents_verified) { toast("Este prestador todavía está en verificación", "shield"); return; }
     navigate(`/jobs/new?provider=${id}`);
   }
 
@@ -170,6 +171,14 @@ export default function ProviderProfile() {
                   <InfoRow icon="calendar" label="Disponibilidad" value={provider.is_available ? "Disponible" : "No disponible"} last />
                 </div>
               </div>
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Verificación</div>
+                <div style={{ background: t.surface, border: `1px solid ${t.lineSoft}`, borderRadius: t.radius, overflow: "hidden" }}>
+                  <InfoRow icon="badge" label="Identidad (DNI)" value={provider.dni_verified ? "Verificada" : "Pendiente"} />
+                  <InfoRow icon="shield" label="Antecedentes penales" value={provider.background_check ? "Presentados" : "—"} last={!(provider.categories ?? []).includes("Gasista")} />
+                  {(provider.categories ?? []).includes("Gasista") && <InfoRow icon="check-circle" label="Matrícula de gasista" value={provider.license_verified ? "Verificada" : "—"} last />}
+                </div>
+              </div>
             </div>
           )}
 
@@ -238,8 +247,17 @@ export default function ProviderProfile() {
 
         {/* action bar */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 20px 30px", background: t.surface, borderTop: `1px solid ${t.lineSoft}`, display: "flex", gap: 10, boxShadow: "0 -8px 30px rgba(0,0,0,0.04)" }}>
-          <Button variant="outline" size="lg" onClick={requestQuote} icon={<Icon name="chat" size={18} color={t.ink} />}>Chatear</Button>
-          <Button variant="green" size="lg" full onClick={requestQuote} icon={<Icon name="plus" size={18} color="#fff" stroke={2.4} />}>Pedir presupuesto</Button>
+          {provider.documents_verified ? (
+            <>
+              <Button variant="outline" size="lg" onClick={requestQuote} icon={<Icon name="chat" size={18} color={t.ink} />}>Chatear</Button>
+              <Button variant="green" size="lg" full onClick={requestQuote} icon={<Icon name="plus" size={18} color="#fff" stroke={2.4} />}>Pedir presupuesto</Button>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, padding: "4px 2px", fontFamily: t.fontBody, fontSize: 13, color: t.inkMute, lineHeight: 1.45 }}>
+              <Icon name="shield" size={20} color={t.inkSoft} />
+              <span>Este perfil está en verificación. Vas a poder contactarlo cuando validemos su identidad.</span>
+            </div>
+          )}
         </div>
       </div>
     </MobileScreen>

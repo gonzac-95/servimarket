@@ -30,7 +30,7 @@ export default function Search() {
 
   // Ciudades donde hay prestadores disponibles (para buscar en otra ciudad)
   useEffect(() => {
-    supabase.from("providers").select("users!inner(city)").eq("is_available", true).limit(500)
+    supabase.from("providers").select("users!inner(city)").eq("is_available", true).eq("documents_verified", true).limit(500)
       .then(({ data }) => {
         const set = new Set<string>();
         (data ?? []).forEach((r: any) => { const c = r.users?.city?.trim(); if (c) set.add(c); });
@@ -43,7 +43,7 @@ export default function Search() {
     const byCity = !!zoneCity;
     let q = supabase.from("providers")
       .select(byCity ? "*, users!inner(id,name,avatar_url,city)" : "*, users(id,name,avatar_url,city)")
-      .eq("is_available", true).limit(40);
+      .eq("is_available", true).eq("documents_verified", true).limit(40);
     if (byCity) q = q.ilike("users.city", zoneCity!);
     const dbName = cat ? categoryById(cat)?.dbName : undefined;
     if (dbName) q = q.contains("categories", [dbName]);
