@@ -11,6 +11,7 @@ import { Avatar, Button, Field, toast } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
 import { format } from "date-fns";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 // ── Comisión: desglose para prestador/cliente ──
 function CommissionBreakdown({ amount, role }: { amount: number; role: "provider" | "client" }) {
@@ -154,6 +155,7 @@ export default function JobDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { tiers } = useCommissionTiers();
   const { enabled: paymentsEnabled } = usePaymentsEnabled();
+  const desktop = useIsDesktop();
 
   const loadJob = useCallback(async () => {
     const { data } = await supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))").eq("id", id).single();
@@ -263,7 +265,7 @@ export default function JobDetail() {
     <MobileScreen>
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
         {/* header */}
-        <div style={{ background: t.surface, padding: "54px 16px 14px", borderBottom: `1px solid ${t.lineSoft}` }}>
+        <div style={{ background: t.surface, padding: "var(--sm-top, 54px) 16px 14px", borderBottom: `1px solid ${t.lineSoft}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => navigate("/dashboard")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surfaceAlt, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="arrow-left" size={20} color={t.ink} />
@@ -307,24 +309,25 @@ export default function JobDetail() {
           )}
         </div>
 
-        {/* tabs */}
-        <div style={{ display: "flex", background: t.surface, padding: "0 16px", borderBottom: `1px solid ${t.lineSoft}` }}>
+        {/* tabs (sólo celular: en escritorio chat y resumen van lado a lado) */}
+        {!desktop && <div style={{ display: "flex", background: t.surface, padding: "0 16px", borderBottom: `1px solid ${t.lineSoft}` }}>
           {(["chat", "resumen"] as const).map(o => (
             <button key={o} onClick={() => setTab(o)} style={{ all: "unset", cursor: "pointer", padding: "12px 16px", position: "relative", fontFamily: t.fontBody, fontSize: 14, fontWeight: tab === o ? 700 : 500, color: tab === o ? t.ink : t.inkMute }}>
               {o === "chat" ? "Chat" : "Resumen"}
               {tab === o && <div style={{ position: "absolute", left: 14, right: 14, bottom: 0, height: 2.5, background: t.ink, borderRadius: 3 }} />}
             </button>
           ))}
-        </div>
+        </div>}
 
-        {tab === "chat" ? (
-          <>
+        <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+        {(desktop || tab === "chat") && (
+          <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
               {messages.length === 0 && <div style={{ textAlign: "center", padding: "40px 0", fontFamily: t.fontBody, color: t.inkSoft, fontSize: 13 }}>Aún no hay mensajes. Iniciá la conversación.</div>}
               {messages.map(m => {
                 const mine = m.sender_id === user?.id;
                 return (
-                  <div key={m.id} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "78%", background: mine ? t.green : t.surface, color: mine ? "#fff" : t.ink, borderRadius: 18, borderTopRightRadius: mine ? 4 : 18, borderTopLeftRadius: mine ? 18 : 4, padding: "10px 14px", border: mine ? "none" : `1px solid ${t.lineSoft}` }}>
+                  <div key={m.id} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: desktop ? "62%" : "78%", background: mine ? t.green : t.surface, color: mine ? "#fff" : t.ink, borderRadius: 18, borderTopRightRadius: mine ? 4 : 18, borderTopLeftRadius: mine ? 18 : 4, padding: "10px 14px", border: mine ? "none" : `1px solid ${t.lineSoft}` }}>
                     <div style={{ fontFamily: t.fontBody, fontSize: 14, lineHeight: 1.4 }}>{m.text}</div>
                     <div style={{ fontFamily: t.fontBody, fontSize: 10, opacity: 0.55, marginTop: 4, textAlign: "right" }}>{format(new Date(m.created_at), "HH:mm")}</div>
                   </div>
@@ -347,7 +350,7 @@ export default function JobDetail() {
               <div ref={messagesEndRef} />
             </div>
             {canChat ? (
-              <div style={{ padding: "10px 14px 30px", background: t.surface, borderTop: `1px solid ${t.lineSoft}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ padding: desktop ? "12px 16px" : "10px 14px 30px", background: t.surface, borderTop: `1px solid ${t.lineSoft}`, display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ flex: 1, height: 44, background: t.surfaceAlt, borderRadius: 999, display: "flex", alignItems: "center", padding: "0 16px" }}>
                   <input value={text} onChange={e => setText(e.target.value)} placeholder="Escribí un mensaje..." onKeyDown={e => e.key === "Enter" && sendMessage()}
                     style={{ all: "unset", flex: 1, fontFamily: t.fontBody, fontSize: 14, color: t.ink }} />
@@ -361,9 +364,14 @@ export default function JobDetail() {
                 Este trabajo fue {job.status === "completed" ? "completado" : "cancelado"}
               </div>
             )}
-          </>
-        ) : (
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 16 }}>
+          </div>
+        )}
+        {(desktop || tab === "resumen") && (
+          <div style={{
+            flex: desktop ? "0 0 400px" : 1, minWidth: 0, overflowY: "auto", padding: "16px 20px 40px", display: "flex", flexDirection: "column", gap: 16,
+            borderLeft: desktop ? `1px solid ${t.lineSoft}` : "none", background: desktop ? t.surface : undefined, boxSizing: "border-box",
+          }}>
+            {desktop && <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em" }}>Resumen del trabajo</div>}
             {/* descripción */}
             <div style={{ background: t.surfaceAlt, borderRadius: t.radiusSm, padding: 14, fontFamily: t.fontBody, fontSize: 13.5, color: t.ink, lineHeight: 1.5 }}>{job.description}</div>
 
@@ -446,6 +454,7 @@ export default function JobDetail() {
             )}
           </div>
         )}
+        </div>
       </div>
     </MobileScreen>
   );

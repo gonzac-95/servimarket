@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { supabase, uploadFile, getStorageUrl } from "../lib/supabase";
 import { useToast } from "../components/ui/use-toast";
+import { DesktopChrome } from "../components/desktop/DesktopChrome";
 import { startMpConnect, disconnectMp, MP_ERROR_MESSAGES } from "../lib/mp-oauth";
 import {
   ArrowLeft, Loader2, Save, Camera, Plus, Trash2, ChevronDown, ChevronUp,
@@ -220,6 +221,7 @@ export default function Settings() {
   );
 
   return (
+    <DesktopChrome>
     <div className="min-h-screen bg-gray-50/50">
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-lg mx-auto px-4 flex items-center gap-3 h-16">
@@ -574,5 +576,6 @@ export default function Settings() {
         </button>
       </div>
     </div>
+    </DesktopChrome>
   );
 }

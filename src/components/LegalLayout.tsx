@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { DesktopChrome } from "./desktop/DesktopChrome";
 
 interface LegalLayoutProps {
   title: string;
@@ -11,6 +12,7 @@ interface LegalLayoutProps {
 export default function LegalLayout({ title, updatedAt, children }: LegalLayoutProps) {
   const navigate = useNavigate();
   return (
+    <DesktopChrome>
     <div className="min-h-screen bg-gray-50/50">
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-4 flex items-center gap-3 h-16">
@@ -29,6 +31,7 @@ export default function LegalLayout({ title, updatedAt, children }: LegalLayoutP
         </div>
       </main>
     </div>
+    </DesktopChrome>
   );
 }
 

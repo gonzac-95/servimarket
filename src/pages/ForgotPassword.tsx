@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2, ArrowLeft, MailCheck } from "lucide-react";
+import { AuthLayout } from "../components/desktop/AuthLayout";
 
 export default function ForgotPassword() {
   const { resetPassword } = useAuth();
@@ -26,6 +27,7 @@ export default function ForgotPassword() {
   }
 
   return (
+    <AuthLayout>
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white rounded-2xl border shadow-sm p-8">
         <div className="text-center mb-6">
@@ -77,5 +79,6 @@ export default function ForgotPassword() {
         )}
       </div>
     </div>
+    </AuthLayout>
   );
 }

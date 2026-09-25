@@ -9,6 +9,8 @@ import { categoryByDbName } from "../lib/categories";
 import { Button } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { listLayout } from "../lib/layout";
 
 function stateInfo(job: Job, t: ReturnType<typeof useTheme>) {
   if (job.status === "in_progress" && job.provider_completed_at)
@@ -24,6 +26,7 @@ function stateInfo(job: Job, t: ReturnType<typeof useTheme>) {
 
 export default function Dashboard() {
   const t = useTheme();
+  const desktop = useIsDesktop();
   const { user, provider } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -53,7 +56,7 @@ export default function Dashboard() {
   return (
     <MobileScreen>
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "54px 20px 16px" }}>
+        <div style={{ padding: "var(--sm-top, 54px) 20px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 32, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em" }}>Mis trabajos</h1>
             {isClient && (
@@ -76,11 +79,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 20px 100px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 20px 100px", ...listLayout(desktop, 340) }}>
           {loading ? (
-            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div>
+            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute, gridColumn: "1 / -1" }}>Cargando...</div>
           ) : list.length === 0 ? (
-            <div style={{ padding: "70px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
+            <div style={{ padding: "70px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute, gridColumn: "1 / -1" }}>
               <div style={{ fontSize: 40 }}>📭</div>
               <div style={{ marginTop: 8 }}>No hay trabajos {tab === "active" ? "activos" : "terminados"} todavía.</div>
               {isClient && <div style={{ marginTop: 20 }}><Button variant="green" onClick={() => navigate("/search")}>Buscar un prestador</Button></div>}

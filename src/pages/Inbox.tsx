@@ -102,9 +102,9 @@ export default function Inbox() {
   }, [user, provider?.id, isProvider]);
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "54px 20px 12px" }}>
+        <div style={{ padding: "var(--sm-top, 54px) 20px 12px" }}>
           <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 32, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em" }}>Bandeja</h1>
           <div style={{ marginTop: 4, fontFamily: t.fontBody, fontSize: 13, color: t.inkMute }}>
             Tus conversaciones con {isProvider ? "clientes" : "prestadores"}

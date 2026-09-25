@@ -93,7 +93,7 @@ export default function Notifications() {
   );
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
         <TopBar title="Notificaciones" onBack={() => navigate(-1)} right={
           items.some(n => !n.read)

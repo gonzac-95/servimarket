@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { AuthLayout } from "../components/desktop/AuthLayout";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { Button, Field, toast } from "../components/mobile/kit";
@@ -9,7 +10,8 @@ export default function Register() {
   const t = useTheme();
   const { signUp } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState<"client" | "provider">("client");
+  const [searchParams] = useSearchParams();
+  const [role, setRole] = useState<"client" | "provider">(searchParams.get("role") === "provider" ? "provider" : "client");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -33,6 +35,7 @@ export default function Register() {
 
   if (sent) {
     return (
+      <AuthLayout>
       <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", maxWidth: 480, margin: "0 auto", padding: 24, boxSizing: "border-box" }}>
         <div style={{ width: 76, height: 76, borderRadius: 24, background: t.greenSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="chat" size={36} color={t.green} />
@@ -49,12 +52,14 @@ export default function Register() {
           <Button variant="green" size="lg" full onClick={() => navigate("/login")}>Ir a ingresar</Button>
         </div>
       </div>
+      </AuthLayout>
     );
   }
 
   return (
+    <AuthLayout>
     <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", overflowY: "auto" }}>
-      <div style={{ padding: "54px 20px 0" }}>
+      <div style={{ padding: "var(--sm-top, 54px) 20px 0" }}>
         <button onClick={() => navigate("/login")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="arrow-left" size={20} color={t.ink} />
         </button>
@@ -102,5 +107,6 @@ export default function Register() {
         <Button variant="green" size="lg" full onClick={handleSubmit} disabled={!accept || loading}>{loading ? "Creando..." : "Crear cuenta"}</Button>
       </div>
     </div>
+    </AuthLayout>
   );
 }

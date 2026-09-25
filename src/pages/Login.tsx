@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { AuthLayout } from "../components/desktop/AuthLayout";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { useAuth, PUBLIC_WEB_URL } from "../lib/auth";
@@ -74,8 +75,9 @@ export default function Login() {
   }
 
   return (
+    <AuthLayout>
     <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto", overflowY: "auto" }}>
-      <div style={{ padding: "54px 20px 0" }}>
+      <div style={{ padding: "var(--sm-top, 54px) 20px 0" }}>
         <button onClick={() => navigate("/")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon name="arrow-left" size={20} color={t.ink} />
         </button>
@@ -123,5 +125,6 @@ export default function Login() {
         </div>
       </div>
     </div>
+    </AuthLayout>
   );
 }

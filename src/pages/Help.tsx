@@ -59,9 +59,9 @@ export default function Help() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "54px 16px 8px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "var(--sm-top, 54px) 16px 8px", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => navigate(-1)} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="arrow-left" size={20} color={t.ink} />
           </button>

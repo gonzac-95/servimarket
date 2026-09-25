@@ -4,6 +4,7 @@ import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2, ShieldCheck, AlertCircle } from "lucide-react";
+import { AuthLayout } from "../components/desktop/AuthLayout";
 
 export default function ResetPassword() {
   const { updatePassword } = useAuth();
@@ -61,6 +62,7 @@ export default function ResetPassword() {
   }
 
   return (
+    <AuthLayout>
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white rounded-2xl border shadow-sm p-8">
         <div className="text-center mb-6">
@@ -115,5 +117,6 @@ export default function ResetPassword() {
         )}
       </div>
     </div>
+    </AuthLayout>
   );
 }

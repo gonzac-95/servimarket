@@ -104,9 +104,9 @@ export default function JobCreate() {
   );
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, zIndex: 40, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "54px 16px 0", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "var(--sm-top, 54px) 16px 0", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={prev} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name={step === 0 ? "close" : "arrow-left"} size={20} color={t.ink} />
           </button>

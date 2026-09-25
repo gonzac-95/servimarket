@@ -2,6 +2,7 @@
 import { type ReactNode, useEffect, useState, type CSSProperties } from "react";
 import { useTheme, shade } from "../../lib/theme";
 import { Icon } from "./Icon";
+import { useIsDesktop } from "../../lib/useIsDesktop";
 
 // ── Avatar ──────────────────────────────────────────
 export function Avatar({ initials, hue = "#15803D", size = 44, ring, src }: {
@@ -153,13 +154,13 @@ export interface ProviderCardData {
   neighborhood?: string; distanceKm?: number; responseMin?: number; isNew?: boolean;
   avatarUrl?: string | null;
 }
-export function ProviderCard({ provider, onClick, layout = "list" }: { provider: ProviderCardData; onClick?: () => void; layout?: "list" | "compact" }) {
+export function ProviderCard({ provider, onClick, layout = "list", fluid }: { provider: ProviderCardData; onClick?: () => void; layout?: "list" | "compact"; fluid?: boolean }) {
   const t = useTheme();
   const p = provider;
   if (layout === "compact") {
     return (
       <button onClick={onClick} style={{
-        all: "unset", cursor: "pointer", width: 224, flexShrink: 0,
+        all: "unset", cursor: "pointer", width: fluid ? "100%" : 224, flexShrink: 0,
         background: t.surface, borderRadius: t.radius, padding: 14,
         border: `1px solid ${t.lineSoft}`, boxShadow: t.shadow,
         display: "flex", flexDirection: "column", gap: 10, boxSizing: "border-box",
@@ -288,7 +289,22 @@ export function BottomNav({ active, onChange, role = "client" }: { active?: stri
 // ── Sheet (modal inferior) ──────────────────────────
 export function Sheet({ open, onClose, children, height = "auto" }: { open: boolean; onClose: () => void; children: ReactNode; height?: string | number }) {
   const t = useTheme();
+  const desktop = useIsDesktop();
   if (!open) return null;
+  // En escritorio la hoja inferior se muestra como un diálogo centrado
+  if (desktop) {
+    return (
+      <div style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,31,24,0.45)", animation: "fade-in 0.2s ease" }} />
+        <div style={{
+          position: "relative", width: "100%", maxWidth: 480, background: t.surface, borderRadius: t.radiusLg,
+          padding: "24px 0", boxShadow: t.shadowLg, animation: "fade-in 0.2s ease",
+        }}>
+          {children}
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 50 }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(15,31,24,0.45)", animation: "fade-in 0.2s ease" }} />

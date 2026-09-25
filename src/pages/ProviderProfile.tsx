@@ -58,8 +58,8 @@ export default function ProviderProfile() {
     load();
   }, [id]);
 
-  if (loading) return <MobileScreen><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div></MobileScreen>;
-  if (!provider) return <MobileScreen><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>Prestador no encontrado</div></MobileScreen>;
+  if (loading) return <MobileScreen width="narrow"><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>Cargando...</div></MobileScreen>;
+  if (!provider) return <MobileScreen width="narrow"><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>Prestador no encontrado</div></MobileScreen>;
 
   const u = provider.users;
   const name = u?.name ?? "Prestador";
@@ -100,10 +100,10 @@ export default function ProviderProfile() {
   }
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
         {/* hero */}
-        <div style={{ background: t.surfaceDeep, padding: "54px 16px 28px", position: "relative", overflow: "hidden" }}>
+        <div style={{ background: t.surfaceDeep, padding: "var(--sm-top, 54px) 16px 28px", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", right: -60, top: -40, width: 220, height: 220, borderRadius: 999, background: `radial-gradient(circle, ${shade(hue, 10)}55, transparent 70%)` }} />
           <TopBar title="" onBack={() => navigate(-1)} transparent dark right={
             <button onClick={handleFavorite} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>

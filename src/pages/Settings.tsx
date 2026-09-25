@@ -55,9 +55,9 @@ export default function Settings() {
   }
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "54px 20px 8px" }}>
+        <div style={{ padding: "var(--sm-top, 54px) 20px 8px" }}>
           <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: 32, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em" }}>Perfil</h1>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 20px 100px" }}>

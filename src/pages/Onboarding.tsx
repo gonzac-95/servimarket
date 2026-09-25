@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { AuthLayout } from "../components/desktop/AuthLayout";
 import { useTheme } from "../lib/theme";
 import { Button, Logo } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
@@ -110,8 +111,9 @@ export default function Onboarding() {
   const isLast = idx === slides.length - 1;
 
   return (
+    <AuthLayout>
     <div style={{ position: "fixed", inset: 0, background: t.bg, display: "flex", flexDirection: "column", maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ padding: "54px 20px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "var(--sm-top, 54px) 20px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Logo size={22} />
         {!isLast && <button onClick={finish} style={{ all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 14, color: t.inkMute, fontWeight: 600 }}>Saltar</button>}
       </div>
@@ -133,5 +135,6 @@ export default function Onboarding() {
       </div>
       <div style={{ height: 34 }} />
     </div>
+    </AuthLayout>
   );
 }

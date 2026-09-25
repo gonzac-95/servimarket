@@ -8,9 +8,12 @@ import { CATEGORIES, categoryById, mapProvider } from "../lib/categories";
 import { Chip, ProviderCard } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { listLayout } from "../lib/layout";
 
 export default function Search() {
   const t = useTheme();
+  const desktop = useIsDesktop();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -69,7 +72,7 @@ export default function Search() {
     <MobileScreen>
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
         {/* top bar */}
-        <div style={{ padding: "54px 16px 0", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ padding: "var(--sm-top, 54px) 16px 0", display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => navigate("/home")} style={{ all: "unset", cursor: "pointer", width: 40, height: 40, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="arrow-left" size={20} color={t.ink} />
           </button>
@@ -85,7 +88,7 @@ export default function Search() {
 
         {/* chips de categoría */}
         <div style={{ padding: "14px 0 6px" }}>
-          <div style={{ display: "flex", gap: 8, padding: "0 16px", overflowX: "auto" }} className="scrollbar-hide">
+          <div style={{ display: "flex", gap: 8, padding: "0 16px", overflowX: desktop ? "visible" : "auto", flexWrap: desktop ? "wrap" : "nowrap" }} className="scrollbar-hide">
             <Chip active={!cat} onClick={() => setCat(null)}>Todas</Chip>
             {CATEGORIES.map(c => (
               <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} icon={<CategoryIcon name={c.id} size={14} color={cat === c.id ? "#fff" : c.hue} />}>{c.label}</Chip>
@@ -148,11 +151,11 @@ export default function Search() {
         )}
 
         {/* resultados */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 100px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px 100px", ...listLayout(desktop, 340, 10) }}>
           {loading ? (
-            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>Buscando...</div>
+            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute, gridColumn: "1 / -1" }}>Buscando...</div>
           ) : results.length === 0 ? (
-            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute }}>
+            <div style={{ padding: "60px 0", textAlign: "center", fontFamily: t.fontBody, color: t.inkMute, gridColumn: "1 / -1" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🔍</div>
               {zoneCity ? (
                 <>

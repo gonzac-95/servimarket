@@ -8,6 +8,7 @@ import { Avatar } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 import { usePaymentsEnabled } from "../lib/features";
+import { useIsDesktop } from "../lib/useIsDesktop";
 
 type Period = "month" | "year" | "all";
 
@@ -22,6 +23,7 @@ export default function ProviderHome() {
   const [docStatus, setDocStatus] = useState<"none" | "pending" | "rejected">("none");
   const [loading, setLoading] = useState(true);
   const { enabled: paymentsEnabled } = usePaymentsEnabled();
+  const desktop = useIsDesktop();
 
   useEffect(() => {
     if (!provider?.id) { setLoading(false); return; }
@@ -85,18 +87,21 @@ export default function ProviderHome() {
   return (
     <MobileScreen>
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "54px 20px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "var(--sm-top, 54px) 20px 16px", display: "flex", alignItems: "center", gap: 12 }}>
           {user?.avatar_url ? <img src={user.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: 999, objectFit: "cover" }} /> : <Avatar initials={initials} hue={t.green} size={40} />}
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.inkMute }}>Buen día,</div>
             <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700, color: t.ink, marginTop: 1 }}>{user?.name}</div>
           </div>
-          <button onClick={() => navigate("/notifications")} style={{ all: "unset", cursor: "pointer", width: 42, height: 42, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {!desktop && <button onClick={() => navigate("/notifications")} style={{ all: "unset", cursor: "pointer", width: 42, height: 42, borderRadius: 999, background: t.surface, border: `1px solid ${t.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="bell" size={20} color={t.ink} />
-          </button>
+          </button>}
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 0 100px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: desktop ? "4px 0 48px" : "4px 0 100px",
+          ...(desktop ? { display: "grid", gridTemplateColumns: "400px 1fr", gap: 8, alignItems: "start" } : {}) }}>
+          {/* columna izquierda en escritorio: avisos + métricas */}
+          <div>
           {/* Verificación de identidad */}
           {provider && !provider.documents_verified && (
             <div onClick={() => navigate("/verificacion")} style={{ margin: "0 20px 12px", padding: 16, background: t.surfaceDeep, color: "#fff", borderRadius: t.radius, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
@@ -161,6 +166,10 @@ export default function ProviderHome() {
             </div>
           </div>
 
+          </div>
+
+          {/* columna derecha en escritorio: solicitudes */}
+          <div>
           {/* Solicitudes */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", padding: "0 20px", marginBottom: 12 }}>
             <h2 style={{ fontFamily: t.fontDisplay, fontSize: 22, fontWeight: 700, color: t.ink, margin: 0, letterSpacing: "-0.02em" }}>
@@ -194,6 +203,7 @@ export default function ProviderHome() {
                 </button>
               );
             })}
+          </div>
           </div>
         </div>
 

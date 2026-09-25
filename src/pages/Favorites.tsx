@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { useFavorites } from "../hooks/useFavorites";
 import { ArrowLeft, Heart, Star, MapPin, CheckCircle2, Loader2 } from "lucide-react";
+import { DesktopChrome } from "../components/desktop/DesktopChrome";
 
 export default function Favorites() {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export default function Favorites() {
   }, [user, favorites]);
 
   return (
+    <DesktopChrome>
     <div className="min-h-screen bg-gray-50/50">
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-2xl mx-auto px-4 flex items-center gap-3 h-16">
@@ -98,5 +100,6 @@ export default function Favorites() {
         )}
       </div>
     </div>
+    </DesktopChrome>
   );
 }

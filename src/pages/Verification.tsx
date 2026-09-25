@@ -190,7 +190,7 @@ export default function Verification() {
   }, [provider?.id, load, refreshUser]);
 
   if (user && user.role !== "provider") {
-    return <MobileScreen><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>La verificación es sólo para cuentas de prestador.</div></MobileScreen>;
+    return <MobileScreen width="narrow"><div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", background: t.bg, fontFamily: t.fontBody, color: t.inkMute }}>La verificación es sólo para cuentas de prestador.</div></MobileScreen>;
   }
 
   const specs = specsFor(provider?.categories ?? []);
@@ -204,9 +204,9 @@ export default function Verification() {
       : { icon: "shield", title: "Verificá tu identidad", body: "Para cuidar a los clientes, sólo mostramos prestadores con el DNI verificado. Subilo y empezá a recibir pedidos.", color: t.greenBright };
 
   return (
-    <MobileScreen>
+    <MobileScreen width="narrow">
       <div style={{ position: "absolute", inset: 0, background: t.bg, display: "flex", flexDirection: "column" }}>
-        <div style={{ paddingTop: 44 }}>
+        <div style={{ paddingTop: "calc(var(--sm-top, 54px) - 10px)" }}>
           <TopBar title="Verificación" onBack={() => navigate(-1)} />
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 20px 40px" }}>
