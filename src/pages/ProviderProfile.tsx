@@ -8,6 +8,8 @@ import { categoryByDbName } from "../lib/categories";
 import { Avatar, Button, Tag, TopBar, toast } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
+import { useSeo } from "../lib/seo";
+import { track } from "../lib/analytics";
 
 function Stat({ label, value, sub, icon }: { label: string; value: string | number; sub: string; icon?: string }) {
   const t = useTheme();
@@ -47,6 +49,22 @@ export default function ProviderProfile() {
   const [tab, setTab] = useState<"about" | "reviews" | "work">("about");
   const { isFavorite, toggleFavorite } = useFavorites();
 
+  // SEO: "Juan Pérez · Gasista en Rosario"
+  const seoName = provider?.users?.name as string | undefined;
+  const seoCat = provider?.categories?.[0] ? (categoryByDbName(provider.categories[0])?.label ?? provider.categories[0]) : null;
+  const seoCity = provider?.users?.city as string | undefined;
+  useSeo(provider ? {
+    title: `${seoName ?? "Prestador"}${seoCat ? ` · ${seoCat}` : ""}${seoCity ? ` en ${seoCity}` : ""}`,
+    description: (provider.bio?.trim()?.slice(0, 150)) ||
+      `${seoCat ?? "Profesional"}${seoCity ? ` en ${seoCity}` : ""} con DNI verificado en ServiMarket.${provider.reviews_count ? ` ${Number(provider.rating_avg).toFixed(1)} ★ en ${provider.reviews_count} reseñas.` : ""} Pedí presupuesto sin cargo.`,
+    path: `/provider/${provider.id}`,
+    image: provider.users?.avatar_url || undefined,
+    noindex: !provider.documents_verified,
+  } : { path: `/provider/${id}` });
+  useEffect(() => {
+    if (provider) track("provider_viewed", { provider_id: provider.id, category: provider.categories?.[0], verified: !!provider.documents_verified });
+  }, [provider?.id]);
+
   useEffect(() => {
     async function load() {
       const { data: p } = await supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("id", id).single();
@@ -78,6 +96,7 @@ export default function ProviderProfile() {
   });
 
   function requestQuote() {
+    track("contact_started", { provider_id: id, logged_in: !!user });
     // Invitado: acá recién se le pide crear cuenta, y vuelve directo al pedido
     if (!user) {
       toast("Creá tu cuenta para contactar al prestador", "user");

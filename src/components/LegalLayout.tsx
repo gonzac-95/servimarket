@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useSeo } from "../lib/seo";
 import { ArrowLeft } from "lucide-react";
 import { DesktopChrome } from "./desktop/DesktopChrome";
 
@@ -11,6 +12,8 @@ interface LegalLayoutProps {
 
 export default function LegalLayout({ title, updatedAt, children }: LegalLayoutProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  useSeo({ title, path: pathname });
   return (
     <DesktopChrome>
     <div className="min-h-screen bg-gray-50/50">

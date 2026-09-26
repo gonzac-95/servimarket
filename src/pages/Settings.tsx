@@ -7,6 +7,7 @@ import { Avatar, Button, Rating, Sheet, toast } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 import { whatsappLink } from "../lib/support";
+import { track } from "../lib/analytics";
 
 function Row({ icon, label, value, badge, onClick }: { icon: string; label: string; value?: string; badge?: string; onClick: () => void }) {
   const t = useTheme();
@@ -102,7 +103,7 @@ export default function Settings() {
 
           <Section title="Soporte">
             <Row icon="chat" label="Centro de ayuda" onClick={() => navigate("/help")} />
-            <Row icon="phone" label="Escribinos por WhatsApp" onClick={() => window.open(whatsappLink(), "_blank", "noopener")} />
+            <Row icon="phone" label="Escribinos por WhatsApp" onClick={() => { track("whatsapp_support", { source: "settings" }); window.open(whatsappLink(), "_blank", "noopener"); }} />
           </Section>
 
           <button onClick={logout} style={{ all: "unset", cursor: "pointer", marginTop: 18, width: "100%", boxSizing: "border-box", textAlign: "center", padding: 16, borderRadius: t.radius, background: "rgba(192,57,43,0.06)", fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: t.danger, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>

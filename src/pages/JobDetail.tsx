@@ -12,6 +12,7 @@ import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
 import { format } from "date-fns";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { track } from "../lib/analytics";
 
 // ── Comisión: desglose para prestador/cliente ──
 function CommissionBreakdown({ amount, role }: { amount: number; role: "provider" | "client" }) {
@@ -115,6 +116,7 @@ function ReviewCard({ jobId, providerId, onDone }: { jobId: string; providerId: 
     const { error } = await supabase.from("reviews").insert({ job_id: jobId, client_id: user!.id, provider_id: providerId, rating, comment });
     setLoading(false);
     if (error) { toast("Error al enviar reseña", "shield"); return; }
+    track("review_submitted", { rating });
     toast("¡Gracias por tu reseña!", "star");
     onDone();
   }
@@ -225,16 +227,19 @@ export default function JobDetail() {
   async function markProviderDone() {
     const { error } = await supabase.from("jobs").update({ provider_completed_at: new Date().toISOString() }).eq("id", id);
     if (error) { toast("Error al marcar", "shield"); return; }
+    track("job_confirmed_done", { job_id: id, role: "provider" });
     await loadJob(); toast("Trabajo marcado como terminado", "check");
   }
   async function confirmCompletion() {
     const { error } = await supabase.from("jobs").update({ status: "completed", client_confirmed_at: new Date().toISOString() }).eq("id", id);
     if (error) { toast("Error al confirmar", "shield"); return; }
+    track("job_confirmed_done", { job_id: id, role: "client" });
     await loadJob(); toast("¡Trabajo confirmado!", "check");
   }
   async function acceptQuote(q: any) {
     await supabase.from("quotes").update({ status: "accepted" }).eq("id", q.id);
     await supabase.from("jobs").update({ price: q.amount, status: "accepted" }).eq("id", id);
+    track("quote_accepted", { job_id: id });
     loadQuotes(); loadJob();
   }
   async function rejectQuote(q: any) {
@@ -243,7 +248,8 @@ export default function JobDetail() {
   async function sendQuote() {
     if (!job?.provider_id || !quoteForm.amount) return;
     setSendingQuote(true);
-    await supabase.from("quotes").insert({ job_id: id, provider_id: job.provider_id, amount: parseFloat(quoteForm.amount), description: quoteForm.description });
+    const { error: qErr } = await supabase.from("quotes").insert({ job_id: id, provider_id: job.provider_id, amount: parseFloat(quoteForm.amount), description: quoteForm.description });
+    if (!qErr) track("quote_sent", { job_id: id });
     await loadQuotes(); setQuoteForm({ amount: "", description: "" }); setSendingQuote(false);
   }
 

@@ -7,6 +7,7 @@ import { useTheme } from "../lib/theme";
 import { disablePush, enablePush, getPushState, type PushState } from "../lib/webpush";
 import { toast } from "./mobile/kit";
 import { Icon } from "./mobile/Icon";
+import { track } from "../lib/analytics";
 
 function Toggle({ on, disabled, onChange }: { on: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
   const t = useTheme();
@@ -44,7 +45,7 @@ export function NotificationSettings() {
     try {
       const st = next ? await enablePush(user.id) : await disablePush(user.id);
       setPush(st);
-      if (next && st === "enabled") toast("Notificaciones activadas");
+      if (next && st === "enabled") { toast("Notificaciones activadas"); track("push_enabled", { source: "settings" }); }
       if (next && st === "denied") toast("El navegador bloqueó las notificaciones", "close");
     } catch (e) {
       console.warn(e);
@@ -103,7 +104,7 @@ export function PushPrompt({ message, style }: { message: string; style?: CSSPro
     try {
       const st = await enablePush(user!.id);
       setState(st);
-      if (st === "enabled") toast("Notificaciones activadas");
+      if (st === "enabled") { toast("Notificaciones activadas"); track("push_enabled", { source: "prompt" }); }
     } catch { toast("No se pudieron activar las notificaciones", "close"); }
   }
   function dismiss() {

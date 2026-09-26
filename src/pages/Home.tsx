@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { usePaymentsEnabled } from "../lib/features";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -10,6 +10,8 @@ import { CATEGORIES, mapProvider } from "../lib/categories";
 import { Avatar, ProviderCard, SectionHeader } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
+import { track } from "../lib/analytics";
+import { useSeo } from "../lib/seo";
 
 export default function Home() {
   const t = useTheme();
@@ -19,6 +21,7 @@ export default function Home() {
   const { user } = useAuth();
   const [top, setTop] = useState<Provider[]>([]);
   const [unread, setUnread] = useState(0);
+  useSeo({ path: "/home" });
 
   // Los prestadores tienen su propio panel
   useEffect(() => {
@@ -111,12 +114,12 @@ export default function Home() {
           <SectionHeader title="Categorías" action="Ver todas" onAction={() => navigate("/search")} />
           <div style={{ display: "grid", gridTemplateColumns: desktop ? "repeat(auto-fill, minmax(96px, 1fr))" : "repeat(4, 1fr)", gap: desktop ? 16 : 12, padding: desktop ? "0 20px 40px" : "0 20px 28px" }}>
             {(desktop ? CATEGORIES : CATEGORIES.slice(0, 8)).map(cat => (
-              <button key={cat.id} onClick={() => navigate(`/search?category=${cat.id}`)} style={{ all: "unset", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <Link key={cat.id} to={`/servicios/${cat.id}`} style={{ textDecoration: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, WebkitTapHighlightColor: "transparent" }}>
                 <div style={{ width: 60, height: 60, borderRadius: 16, background: t.surface, border: `1px solid ${t.lineSoft}`, boxShadow: t.shadow, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <CategoryIcon name={cat.id} size={28} color={cat.hue} />
                 </div>
                 <div style={{ fontFamily: t.fontBody, fontSize: 11.5, fontWeight: 500, color: t.ink, textAlign: "center", lineHeight: 1.15 }}>{cat.label}</div>
-              </button>
+              </Link>
             ))}
           </div>
 
@@ -129,7 +132,7 @@ export default function Home() {
                   <div style={{ fontFamily: t.fontDisplay, fontSize: desktop ? 24 : 20, fontWeight: 700, letterSpacing: "-0.02em" }}>¿Ofrecés servicios para el hogar?</div>
                   <div style={{ fontFamily: t.fontBody, fontSize: 13.5, opacity: 0.72, marginTop: 6, lineHeight: 1.5 }}>Sumate gratis, verificá tu identidad y empezá a recibir pedidos de clientes de tu zona.</div>
                 </div>
-                <button onClick={() => navigate("/register?role=provider")} style={{ all: "unset", cursor: "pointer", position: "relative", padding: "12px 20px", borderRadius: 999, background: t.greenBright, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
+                <button onClick={() => { track("provider_signup_cta", { source: "home" }); navigate("/register?role=provider"); }} style={{ all: "unset", cursor: "pointer", position: "relative", padding: "12px 20px", borderRadius: 999, background: t.greenBright, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
                   Registrarme como prestador
                 </button>
               </div>

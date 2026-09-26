@@ -7,6 +7,7 @@ import { whatsappLink } from "../lib/support";
 import { Button, TopBar, toast } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
+import { track } from "../lib/analytics";
 
 // ── Tipos ───────────────────────────────────────────
 type DocType = "dni" | "background_check" | "license";
@@ -91,6 +92,7 @@ function DocBlock({ spec, docs, providerId, onChange }: { spec: DocSpec; docs: V
       toast("No se pudo registrar el documento", "close");
       return;
     }
+    track("verification_uploaded", { type: spec.type });
     toast("Documento enviado. Lo revisamos a la brevedad.");
     onChange();
   }

@@ -5,8 +5,10 @@ import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { Button, Field, toast } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
+import { useSeo } from "../lib/seo";
 
 export default function Register() {
+  useSeo({ title: "Crear cuenta", description: "Creá tu cuenta gratis en ServiMarket para pedir presupuestos, o sumate como prestador y recibí trabajos en tu zona.", path: "/register" });
   const t = useTheme();
   const { signUp } = useAuth();
   const navigate = useNavigate();

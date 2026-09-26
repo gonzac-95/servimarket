@@ -3,6 +3,7 @@ import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabase';
 import { User, Provider } from '../types';
+import { identify, resetAnalytics, track } from './analytics';
 
 // URL pública de la web: los links de los emails (confirmación, reset)
 // siempre aterrizan en la web, incluso si la acción se inició desde la app.
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase.rpc('get_my_profile').single();
       if (data) {
         setUser(data as User);
+        identify((data as User).id, { role: (data as User).role, city: (data as User).city });
         if ((data as User).role === 'provider') {
           const { data: provData } = await supabase
             .from('providers')
@@ -96,16 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     // Con "Confirm email" activo en Supabase no hay sesión hasta confirmar.
     const needsConfirmation = !error && !data.session;
+    if (!error) track('signup_completed', { role, method: 'email' });
     return { error: error as Error | null, needsConfirmation };
   }
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error) track('login', { method: 'password' });
     return { error: error as Error | null };
   }
 
   async function signOut() {
     await supabase.auth.signOut();
+    resetAnalytics();
     setUser(null);
     setProvider(null);
     setSession(null);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import type { Provider } from "../types";
@@ -10,17 +10,22 @@ import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { listLayout } from "../lib/layout";
+import { SEO_CATEGORIES, serviceDescription, serviceTitle, slugify, unslugify, useSeo } from "../lib/seo";
+import { track } from "../lib/analytics";
 
-export default function Search() {
+// Sin props: /search (buscador). Con presetCategory: páginas por rubro
+// /servicios/:rubro y /servicios/:rubro/:ciudad (indexables, con título propio).
+export default function Search({ presetCategory, citySlug }: { presetCategory?: string; citySlug?: string } = {}) {
   const t = useTheme();
   const desktop = useIsDesktop();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [cat, setCat] = useState<string | null>(searchParams.get("category"));
+  const seoMode = !!presetCategory;
+  const [cat, setCat] = useState<string | null>(presetCategory ?? searchParams.get("category"));
   const [minRating, setMinRating] = useState<"all" | "4" | "4.5">("all");
   const [sort, setSort] = useState<"rating" | "reviews">("rating");
   const [showFilters, setShowFilters] = useState(false);
@@ -29,7 +34,12 @@ export default function Search() {
   const [zoneCity, setZoneCity] = useState<string | null>(null);
   const [cities, setCities] = useState<string[]>([]);
 
-  useEffect(() => { if (userCity) setZoneCity(userCity); }, [userCity]);
+  const [citiesLoaded, setCitiesLoaded] = useState(false);
+
+  // En el buscador, la zona arranca en la ciudad del usuario. En las páginas
+  // por rubro manda la URL (sin ciudad = todo el país).
+  useEffect(() => { if (userCity && !seoMode) setZoneCity(userCity); }, [userCity, seoMode]);
+  useEffect(() => { if (presetCategory) setCat(presetCategory); }, [presetCategory]);
 
   // Ciudades donde hay prestadores disponibles (para buscar en otra ciudad)
   useEffect(() => {
@@ -38,10 +48,30 @@ export default function Search() {
         const set = new Set<string>();
         (data ?? []).forEach((r: any) => { const c = r.users?.city?.trim(); if (c) set.add(c); });
         setCities([...set].sort((a, b) => a.localeCompare(b, "es")));
+        setCitiesLoaded(true);
       });
   }, []);
 
+  // /servicios/:rubro/:ciudad → buscamos la ciudad real por su slug
+  const slugCity = citySlug ? cities.find(c => slugify(c) === citySlug) ?? null : null;
+  const cityLabel = citySlug ? (slugCity ?? unslugify(citySlug)) : null;
+  const cityMissing = !!citySlug && citiesLoaded && !slugCity;
+  useEffect(() => { if (citySlug && citiesLoaded) setZoneCity(slugCity); }, [citySlug, citiesLoaded, slugCity]);
+  const ready = !citySlug || citiesLoaded;
+
+  useSeo(seoMode
+    ? { title: serviceTitle(presetCategory!, cityLabel), description: serviceDescription(presetCategory!, cityLabel), path: `/servicios/${presetCategory}${citySlug ? `/${citySlug}` : ""}` }
+    : { title: "Buscar profesionales", path: "/search" });
+
+  // Chips de rubro: en las páginas por rubro cambian la URL (así cada rubro tiene su página)
+  function pickCategory(id: string | null) {
+    if (!seoMode) { setCat(id); return; }
+    if (!id) navigate("/search");
+    else navigate(`/servicios/${id}${citySlug ? `/${citySlug}` : ""}`);
+  }
+
   const search = useCallback(async () => {
+    if (!ready) return;
     setLoading(true);
     const byCity = !!zoneCity;
     let q = supabase.from("providers")
@@ -57,7 +87,8 @@ export default function Search() {
     const { data } = await q;
     setProviders((data as unknown as Provider[]) ?? []);
     setLoading(false);
-  }, [cat, minRating, sort, zoneCity]);
+    track("search", { category: cat ?? "all", city: zoneCity ?? "all", results: data?.length ?? 0, landing: seoMode });
+  }, [cat, minRating, sort, zoneCity, ready, seoMode]);
 
   useEffect(() => { search(); }, [search]);
 
@@ -86,12 +117,26 @@ export default function Search() {
           </button>
         </div>
 
+        {/* encabezado de las páginas por rubro */}
+        {seoMode && (
+          <div style={{ padding: "16px 20px 0" }}>
+            <h1 style={{ margin: 0, fontFamily: t.fontDisplay, fontSize: desktop ? 30 : 23, fontWeight: 700, color: t.ink, letterSpacing: "-0.02em", lineHeight: 1.15 }}>
+              {serviceTitle(presetCategory!, cityLabel)}
+            </h1>
+            <p style={{ margin: "6px 0 0", fontFamily: t.fontBody, fontSize: desktop ? 14.5 : 13, color: t.inkMute, lineHeight: 1.45, maxWidth: 720 }}>
+              {cityMissing
+                ? `Todavía no hay prestadores verificados en ${cityLabel}. Te mostramos los de todo el país.`
+                : "Todos con DNI verificado por ServiMarket. Mirá sus reseñas, pedí presupuesto sin cargo y coordiná el trabajo por el chat."}
+            </p>
+          </div>
+        )}
+
         {/* chips de categoría */}
         <div style={{ padding: "14px 0 6px" }}>
           <div style={{ display: "flex", gap: 8, padding: "0 16px", overflowX: desktop ? "visible" : "auto", flexWrap: desktop ? "wrap" : "nowrap" }} className="scrollbar-hide">
-            <Chip active={!cat} onClick={() => setCat(null)}>Todas</Chip>
+            <Chip active={!cat} onClick={() => pickCategory(null)}>Todas</Chip>
             {CATEGORIES.map(c => (
-              <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} icon={<CategoryIcon name={c.id} size={14} color={cat === c.id ? "#fff" : c.hue} />}>{c.label}</Chip>
+              <Chip key={c.id} active={cat === c.id} onClick={() => pickCategory(c.id)} icon={<CategoryIcon name={c.id} size={14} color={cat === c.id ? "#fff" : c.hue} />}>{c.label}</Chip>
             ))}
           </div>
         </div>
@@ -167,6 +212,22 @@ export default function Search() {
               ) : "Sin resultados. Probá con otra categoría."}
             </div>
           ) : results.map(p => <ProviderCard key={p.id} provider={p} onClick={() => navigate(`/provider/${p.id}`)} />)}
+
+          {/* enlaces a otros rubros (ayudan a los buscadores a recorrer el sitio) */}
+          {seoMode && !loading && (
+            <nav aria-label="Otros servicios" style={{ gridColumn: "1 / -1", marginTop: 24, paddingTop: 16, borderTop: `1px solid ${t.lineSoft}` }}>
+              <div style={{ fontFamily: t.fontBody, fontSize: 12, fontWeight: 700, color: t.inkMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+                Otros servicios{cityLabel && !cityMissing ? ` en ${cityLabel}` : ""}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
+                {SEO_CATEGORIES.filter(c => c.id !== cat).map(c => (
+                  <Link key={c.id} to={`/servicios/${c.id}${citySlug && !cityMissing ? `/${citySlug}` : ""}`} style={{ fontFamily: t.fontBody, fontSize: 13.5, color: t.green, textDecoration: "none", fontWeight: 600 }}>
+                    {serviceTitle(c.id, cityLabel && !cityMissing ? cityLabel : null)}
+                  </Link>
+                ))}
+              </div>
+            </nav>
+          )}
         </div>
 
         <TabBar active="search" />

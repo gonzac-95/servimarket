@@ -7,6 +7,7 @@ import { CATEGORIES, categoryById } from "../lib/categories";
 import { Button, Field, Avatar, toast } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
+import { track } from "../lib/analytics";
 
 const STEPS = ["Categoría", "Detalles", "Cuándo", "Revisar"];
 
@@ -75,6 +76,7 @@ export default function JobCreate() {
       toast(error.message.includes("provider_not_verified") ? "Este prestador todavía está en verificación" : "Error al crear el pedido", "shield");
       return;
     }
+    track("job_requested", { category: cat.id, provider_id: providerId });
     toast("¡Pedido publicado!", "check");
     navigate(`/jobs/${data.id}`);
   }

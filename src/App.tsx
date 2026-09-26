@@ -4,6 +4,7 @@ import { Toaster } from './components/ui/toaster';
 import { ThemeProvider } from './lib/theme';
 import { Toaster as MobileToaster } from './components/mobile/kit';
 import NativeBridge from './components/NativeBridge';
+import WhatsAppFloat from './components/WhatsAppFloat';
 
 // Pages
 import Splash from './pages/Splash';
@@ -30,6 +31,7 @@ import EditProfile from './pages/EditProfile';
 import Favorites from './pages/Favorites';
 import Admin from './pages/Admin';
 import Verification from './pages/Verification';
+import ServiceLanding from './pages/ServiceLanding';
 import NotFound from './pages/NotFound';
 
 // Protected route wrapper
@@ -65,6 +67,8 @@ export default function App() {
             <Route path="/eliminar-cuenta" element={<DeleteAccountInfo />} />
             <Route path="/help" element={<Help />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/servicios/:rubro" element={<ServiceLanding />} />
+            <Route path="/servicios/:rubro/:ciudad" element={<ServiceLanding />} />
             <Route path="/provider/:id" element={<ProviderProfile />} />
             <Route path="/home" element={<Home />} />
 
@@ -86,6 +90,7 @@ export default function App() {
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <WhatsAppFloat />
           <Toaster />
           <MobileToaster />
         </BrowserRouter>

@@ -9,8 +9,11 @@ import { useTheme } from "../lib/theme";
 import { Button, Field, GoogleG, toast } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
 import { OAUTH_CALLBACK } from "../components/NativeBridge";
+import { track } from "../lib/analytics";
+import { useSeo } from "../lib/seo";
 
 export default function Login() {
+  useSeo({ title: "Ingresar", path: "/login" });
   const t = useTheme();
   const { signIn } = useAuth();
   const navigate = useNavigate();
@@ -61,6 +64,7 @@ export default function Login() {
 
   async function handleGoogle() {
     const isNative = Capacitor.isNativePlatform();
+    track("login", { method: "google" });
     // En la app nativa el OAuth se abre en el navegador del sistema (Google
     // bloquea webviews) y vuelve por deep link, que procesa NativeBridge.
     const { data, error } = await supabase.auth.signInWithOAuth({

@@ -1,0 +1,18 @@
+# ServiMarket — https://servimarket.app
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /jobs/
+Disallow: /inbox
+Disallow: /notifications
+Disallow: /settings
+Disallow: /favorites
+Disallow: /verificacion
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /onboarding
+Disallow: /provider$
+Disallow: /api/
+
+Sitemap: https://servimarket.app/sitemap.xml

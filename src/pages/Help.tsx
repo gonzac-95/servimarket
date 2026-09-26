@@ -5,6 +5,8 @@ import { Icon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
 import { usePaymentsEnabled } from "../lib/features";
 import { SUPPORT_EMAIL, whatsappLink } from "../lib/support";
+import { track } from "../lib/analytics";
+import { useSeo } from "../lib/seo";
 
 function buildFaqs(paymentsEnabled: boolean): { q: string; a: string }[] {
   return [
@@ -52,6 +54,7 @@ function buildFaqs(paymentsEnabled: boolean): { q: string; a: string }[] {
 }
 
 export default function Help() {
+  useSeo({ title: "Ayuda y preguntas frecuentes", path: "/help" });
   const t = useTheme();
   const { enabled: paymentsEnabled } = usePaymentsEnabled();
   const FAQS = buildFaqs(paymentsEnabled);
@@ -92,7 +95,7 @@ export default function Help() {
           <div style={{ marginTop: 20, padding: 18, background: t.surfaceDeep, borderRadius: t.radius, color: "#fff" }}>
             <div style={{ fontFamily: t.fontBody, fontSize: 15, fontWeight: 700 }}>¿No encontraste tu respuesta?</div>
             <div style={{ fontFamily: t.fontBody, fontSize: 12.5, opacity: 0.7, marginTop: 4, lineHeight: 1.5 }}>Escribinos y te respondemos lo antes posible.</div>
-            <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 46, background: t.green, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>
+            <a href={whatsappLink()} onClick={() => track("whatsapp_support", { source: "help" })} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", marginTop: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 46, background: t.green, borderRadius: t.radiusSm, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>
               <Icon name="phone" size={17} color="#fff" /> Escribinos por WhatsApp
             </a>
             <a href={`mailto:${SUPPORT_EMAIL}`} style={{ textDecoration: "none", marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, borderRadius: t.radiusSm, border: "1px solid rgba(255,255,255,0.18)", fontFamily: t.fontBody, fontSize: 13, fontWeight: 600, color: "#fff" }}>

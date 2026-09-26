@@ -3,19 +3,92 @@
   "buildCommand": "chmod +x node_modules/.bin/vite && node_modules/.bin/vite build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!assets/|sw\\.js|manifest\\.webmanifest|favicon|icon-|badge-|apple-touch-icon).*)", "destination": "/index.html" }
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/provider/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|Facebot|WhatsApp|Pinterest|Embedly|Google-InspectionTool|SkypeUriPreview|vkShare|Iframely).*"
+        }
+      ],
+      "destination": "/api/seo?kind=provider&id=:id"
+    },
+    {
+      "source": "/servicios/:rubro/:ciudad",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|Facebot|WhatsApp|Pinterest|Embedly|Google-InspectionTool|SkypeUriPreview|vkShare|Iframely).*"
+        }
+      ],
+      "destination": "/api/seo?kind=servicio&rubro=:rubro&ciudad=:ciudad"
+    },
+    {
+      "source": "/servicios/:rubro",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|Facebot|WhatsApp|Pinterest|Embedly|Google-InspectionTool|SkypeUriPreview|vkShare|Iframely).*"
+        }
+      ],
+      "destination": "/api/seo?kind=servicio&rubro=:rubro"
+    },
+    {
+      "source": "/home",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|Facebot|WhatsApp|Pinterest|Embedly|Google-InspectionTool|SkypeUriPreview|vkShare|Iframely).*"
+        }
+      ],
+      "destination": "/api/seo?kind=home"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(bot|Bot|BOT|crawler|Crawler|spider|Spider|facebookexternalhit|Facebot|WhatsApp|Pinterest|Embedly|Google-InspectionTool|SkypeUriPreview|vkShare|Iframely).*"
+        }
+      ],
+      "destination": "/api/seo?kind=home"
+    },
+    {
+      "source": "/((?!api/|assets/|sw\\.js|manifest\\.webmanifest|robots\\.txt|og-image|favicon|icon-|badge-|apple-touch-icon).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Service-Worker-Allowed", "value": "/" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
       ]
     },
     {
       "source": "/manifest.webmanifest",
-      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
     }
   ]
 }

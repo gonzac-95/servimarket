@@ -5,8 +5,10 @@ import { useTheme } from "../lib/theme";
 import { Button, Logo } from "../components/mobile/kit";
 import { Icon } from "../components/mobile/Icon";
 import { usePaymentsEnabled } from "../lib/features";
+import { useSeo } from "../lib/seo";
 
 export default function Onboarding() {
+  useSeo({ noindex: true });
   const t = useTheme();
   const navigate = useNavigate();
   const [idx, setIdx] = useState(0);

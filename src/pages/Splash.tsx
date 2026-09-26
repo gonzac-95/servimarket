@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
+import { isBot } from "../lib/seo";
 
 export default function Splash() {
   const t = useTheme();
@@ -9,6 +10,8 @@ export default function Splash() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
+    // Buscadores y previews: directo al inicio, sin splash ni onboarding
+    if (isBot()) { navigate("/home", { replace: true }); return; }
     const id = setTimeout(() => {
       if (loading) return;
       if (user) navigate("/home", { replace: true });

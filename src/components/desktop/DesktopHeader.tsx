@@ -8,6 +8,7 @@ import { useTheme } from "../../lib/theme";
 import { whatsappLink } from "../../lib/support";
 import { Avatar, Logo } from "../mobile/kit";
 import { Icon } from "../mobile/Icon";
+import { track } from "../../lib/analytics";
 
 interface NavItem { label: string; to: string; match: (p: string) => boolean; }
 
@@ -86,7 +87,7 @@ export function DesktopHeader() {
               <Icon name="shield" size={15} color="#9B6B12" /> Verificá tu identidad
             </button>
           )}
-          <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" title="Ayuda por WhatsApp" style={{ ...iconBtn, textDecoration: "none" }}>
+          <a href={whatsappLink()} onClick={() => track("whatsapp_support", { source: "header" })} target="_blank" rel="noopener noreferrer" title="Ayuda por WhatsApp" style={{ ...iconBtn, textDecoration: "none" }}>
             <Icon name="phone" size={17} color={t.ink} />
           </a>
 
@@ -105,7 +106,7 @@ export function DesktopHeader() {
             </>
           ) : (
             <>
-              <button onClick={() => navigate("/register?role=provider")} style={{ all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 14, fontWeight: 600, color: t.ink, padding: "0 6px" }}>
+              <button onClick={() => { track("provider_signup_cta", { source: "header" }); navigate("/register?role=provider"); }} style={{ all: "unset", cursor: "pointer", fontFamily: t.fontBody, fontSize: 14, fontWeight: 600, color: t.ink, padding: "0 6px" }}>
                 Soy prestador
               </button>
               <button onClick={() => navigate("/login")} style={{ all: "unset", cursor: "pointer", padding: "10px 20px", borderRadius: 999, background: t.ink, fontFamily: t.fontBody, fontSize: 14, fontWeight: 700, color: "#fff" }}>

@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { DesktopChrome } from "../components/desktop/DesktopChrome";
+import { useSeo } from "../lib/seo";
 export default function NotFound() {
+  useSeo({ title: "Página no encontrada", noindex: true });
   return (
     <DesktopChrome>
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
