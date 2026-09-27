@@ -43,12 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data as User);
         identify((data as User).id, { role: (data as User).role, city: (data as User).city });
         if ((data as User).role === 'provider') {
-          const { data: provData } = await supabase
-            .from('providers')
-            .select('*')
-            .eq('user_id', supaUser.id)
-            .single();
-          setProvider(provData);
+          // Fila completa propia (incluye CUIT y matrícula, que no son públicos)
+          const { data: provData } = await supabase.rpc('get_my_provider').maybeSingle();
+          setProvider((provData as Provider) ?? null);
         }
       }
     } catch (e) {

@@ -8,6 +8,7 @@ import { Button, Field, Avatar, toast } from "../components/mobile/kit";
 import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
 import { track } from "../lib/analytics";
+import { providerSelect } from "../lib/providerColumns";
 
 const STEPS = ["Categoría", "Detalles", "Cuándo", "Revisar"];
 
@@ -32,7 +33,7 @@ export default function JobCreate() {
 
   useEffect(() => {
     if (providerId) {
-      supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("id", providerId).single().then(({ data }) => {
+      supabase.from("providers").select(providerSelect("users(id,name,avatar_url,city)")).eq("id", providerId).single().then(({ data }) => {
         // Sólo prestadores verificados reciben pedidos
         if (data && !data.documents_verified) {
           toast("Este prestador todavía está en verificación", "shield");

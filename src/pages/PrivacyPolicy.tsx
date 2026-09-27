@@ -1,114 +1,137 @@
 import LegalLayout, { LegalSection } from "../components/LegalLayout";
+import { SUPPORT_EMAIL } from "../lib/support";
 
-// NOTA: Borrador estándar. Revisar con un profesional legal antes de publicar.
-// Completar los campos entre [corchetes] con los datos reales del titular.
-const CONTACT_EMAIL = "contacto@servimarket.app";
+// Política de Privacidad — versión de lanzamiento web (Ley 25.326).
+// Si se suma un proveedor nuevo que reciba datos (pagos, mapas, etc.), agregarlo en la sección 5.
+const mail = <a href={`mailto:${SUPPORT_EMAIL}`} className="text-green-600 hover:underline">{SUPPORT_EMAIL}</a>;
 
 export default function PrivacyPolicy() {
   return (
-    <LegalLayout title="Política de Privacidad" updatedAt="4 de julio de 2026">
+    <LegalLayout title="Política de Privacidad" updatedAt="27 de septiembre de 2026">
       <p>
-        En ServiMarket valoramos tu privacidad. Esta política explica qué datos personales
-        recopilamos, con qué fin, con quién los compartimos y qué derechos tenés sobre ellos,
-        en cumplimiento de la Ley 25.326 de Protección de Datos Personales de la República Argentina.
+        En ServiMarket cuidamos tus datos. Esta política explica qué datos personales recopilamos, para qué los
+        usamos, con quién los compartimos y qué derechos tenés, de acuerdo con la Ley 25.326 de Protección de
+        los Datos Personales de la República Argentina.
       </p>
 
-      <LegalSection title="1. Responsable del tratamiento">
+      <LegalSection title="1. Responsable">
         <p>
-          El responsable de la base de datos es [RAZÓN SOCIAL / NOMBRE DEL TITULAR], CUIT [CUIT],
-          con domicilio en [DOMICILIO], Argentina. Para cualquier consulta sobre tus datos podés
-          escribir a <a href={`mailto:${CONTACT_EMAIL}`} className="text-green-600 hover:underline">{CONTACT_EMAIL}</a>.
+          El responsable de los datos es ServiMarket (servimarket.app). Para cualquier consulta sobre tus datos
+          escribinos a {mail}.
         </p>
       </LegalSection>
 
       <LegalSection title="2. Qué datos recopilamos">
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Datos de registro:</strong> nombre, email, teléfono y rol (cliente o prestador).</li>
-          <li><strong>Datos de perfil (prestadores):</strong> descripción, categorías, zonas de servicio, fotos de trabajos, CUIT/CUIL.</li>
-          <li><strong>Datos de uso:</strong> solicitudes de servicio, mensajes, reseñas y calificaciones.</li>
-          <li><strong>Datos de ubicación:</strong> ciudad y dirección del trabajo que ingresás al crear una solicitud.</li>
-          <li><strong>Datos de pago:</strong> los pagos se procesan a través de MercadoPago. No almacenamos números de tarjeta ni datos financieros sensibles en nuestros servidores.</li>
-          <li><strong>Datos técnicos:</strong> información básica del dispositivo y token de notificaciones cuando usás la app móvil.</li>
+          <li><strong>Cuenta:</strong> nombre, email, contraseña (guardada cifrada), teléfono si lo cargás, ciudad y tipo de cuenta (cliente o prestador). Si entrás con Google, recibimos tu nombre, email y foto.</li>
+          <li><strong>Perfil de prestador:</strong> rubros, descripción, zonas de trabajo, precios de referencia, fotos de trabajos y, si lo cargás, CUIT/CUIL (no se muestra a otros usuarios).</li>
+          <li>
+            <strong>Documentos de verificación (prestadores):</strong> foto de tu DNI y, si los enviás, certificado de
+            antecedentes y matrícula. Se guardan en un almacenamiento privado, sólo los ve el equipo de ServiMarket
+            para verificar tu identidad y nunca se muestran a otros usuarios.
+          </li>
+          <li><strong>Uso del servicio:</strong> pedidos, presupuestos, mensajes del chat, reseñas, y la dirección y fotos que cargás en un pedido.</li>
+          <li><strong>Avisos:</strong> tu preferencia de avisos por email y, si activás las notificaciones, el identificador de tu navegador o dispositivo para enviártelas.</li>
+          <li>
+            <strong>Datos de uso y técnicos:</strong> páginas que visitás y acciones dentro de la web (por ejemplo, búsquedas o
+            pedidos enviados), tipo de dispositivo y navegador, y ubicación aproximada según la IP. Los asociamos a un
+            identificador interno, no a tu nombre ni a tu email.
+          </li>
         </ul>
+        <p>Hoy ServiMarket no procesa pagos, así que no recibimos datos de tarjetas ni cuentas bancarias.</p>
       </LegalSection>
 
-      <LegalSection title="3. Cómo usamos tus datos">
+      <LegalSection title="3. Para qué los usamos">
         <ul className="list-disc pl-5 space-y-1">
           <li>Crear y administrar tu cuenta.</li>
-          <li>Conectar clientes con prestadores y permitir la coordinación de trabajos.</li>
-          <li>Procesar pagos y calcular comisiones.</li>
-          <li>Enviar notificaciones relacionadas con tus trabajos.</li>
-          <li>Prevenir fraudes y garantizar la seguridad de la plataforma.</li>
+          <li>Conectar clientes con prestadores y permitir pedir presupuestos, chatear y coordinar trabajos.</li>
+          <li>Verificar la identidad de los prestadores.</li>
+          <li>Enviarte avisos sobre tus trabajos (por email y, si las activás, notificaciones).</li>
+          <li>Entender cómo se usa la web para mejorarla.</li>
+          <li>Prevenir fraudes, abusos y cuidar la seguridad de la plataforma.</li>
+        </ul>
+        <p>No usamos tus datos para publicidad de terceros ni los vendemos.</p>
+      </LegalSection>
+
+      <LegalSection title="4. Qué ven otros usuarios">
+        <ul className="list-disc pl-5 space-y-1">
+          <li>Del prestador: nombre, foto, ciudad, rubros, descripción, fotos de trabajos, precios de referencia, calificación, reseñas y si está verificado.</li>
+          <li>Del cliente: nombre y foto, y las reseñas que publica.</li>
+          <li>Los datos de un pedido (descripción, dirección, fotos, mensajes) sólo los ven el cliente y el prestador de ese pedido.</li>
         </ul>
       </LegalSection>
 
-      <LegalSection title="4. Con quién compartimos tus datos">
-        <p>Compartimos datos únicamente con los proveedores necesarios para operar el servicio:</p>
+      <LegalSection title="5. Con quién los compartimos">
+        <p>Usamos proveedores que tratan datos por cuenta nuestra, sólo para prestar el servicio:</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Supabase:</strong> alojamiento de la base de datos y autenticación.</li>
-          <li><strong>MercadoPago:</strong> procesamiento de pagos.</li>
-          <li><strong>Google Firebase:</strong> envío de notificaciones push a la app móvil.</li>
+          <li><strong>Supabase:</strong> base de datos, inicio de sesión y almacenamiento de archivos.</li>
+          <li><strong>Vercel:</strong> alojamiento de la web.</li>
+          <li><strong>Resend:</strong> envío de emails.</li>
+          <li><strong>PostHog:</strong> estadísticas de uso de la web.</li>
+          <li><strong>Google Firebase:</strong> notificaciones de la app para celulares.</li>
+          <li><strong>Google:</strong> sólo si elegís iniciar sesión con tu cuenta de Google.</li>
         </ul>
         <p>
-          No vendemos tus datos personales a terceros. Los datos visibles para otros usuarios
-          (como tu nombre, perfil de prestador y reseñas) se comparten dentro de la plataforma
-          para el funcionamiento del marketplace.
+          Algunos de estos proveedores guardan los datos en servidores fuera de Argentina (principalmente en Estados
+          Unidos). Al usar ServiMarket prestás tu consentimiento para esa transferencia, que se hace con proveedores que
+          aplican medidas de seguridad adecuadas. También podemos compartir datos si lo exige una autoridad competente.
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Tus derechos">
+      <LegalSection title="6. Cookies y almacenamiento del navegador">
         <p>
-          Como titular de los datos, tenés derecho a acceder, rectificar, actualizar y solicitar
-          la supresión de tus datos personales. Podés eliminar tu cuenta directamente desde la
-          app (Perfil → Eliminar mi cuenta) o siguiendo las instrucciones en{" "}
-          <a href="/eliminar-cuenta" className="text-green-600 hover:underline">servimarket.app/eliminar-cuenta</a>.
-          También podés escribirnos a{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-green-600 hover:underline">{CONTACT_EMAIL}</a>.
+          Usamos el almacenamiento del navegador para mantener tu sesión iniciada y recordar preferencias, y cookies
+          de PostHog para las estadísticas de uso. No usamos cookies de publicidad. Podés borrarlas o bloquearlas desde
+          la configuración de tu navegador; si tu navegador envía la señal "No rastrear" (Do Not Track), no registramos
+          estadísticas de tu visita.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="7. Tus derechos">
+        <p>
+          Podés acceder a tus datos, pedir que los corrijamos o actualicemos, y pedir que los eliminemos. El acceso es
+          gratuito cada seis meses; respondemos los pedidos de acceso en un plazo de 10 días corridos y los de
+          corrección o eliminación en 5 días hábiles. Podés editar tu perfil desde la web, eliminar tu cuenta desde
+          Perfil → "Eliminar mi cuenta" (ver <a href="/eliminar-cuenta" className="text-green-600 hover:underline">servimarket.app/eliminar-cuenta</a>)
+          o escribirnos a {mail}.
         </p>
         <p className="text-xs text-gray-500">
-          La Agencia de Acceso a la Información Pública (AAIP), órgano de control de la Ley 25.326,
-          tiene la atribución de atender denuncias y reclamos respecto del incumplimiento de las
-          normas sobre protección de datos personales.
+          La Agencia de Acceso a la Información Pública (AAIP), órgano de control de la Ley 25.326, tiene la atribución
+          de atender las denuncias y reclamos de quienes resulten afectados en sus derechos por incumplimiento de las
+          normas vigentes en materia de protección de datos personales.
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Seguridad">
+      <LegalSection title="8. Cuánto tiempo los guardamos">
         <p>
-          Aplicamos medidas técnicas y organizativas razonables para proteger tus datos. La
-          información se transmite cifrada (HTTPS) y el acceso a la base de datos está restringido
-          mediante políticas de seguridad. Ningún sistema es 100% infalible, por lo que no podemos
-          garantizar seguridad absoluta.
+          Guardamos tus datos mientras tengas la cuenta activa. Si la eliminás, borramos tus datos personales, tus fotos
+          y tus documentos de verificación. El historial de trabajos y reseñas queda anonimizado (sin datos que te
+          identifiquen) porque también forma parte del historial de la otra persona. Las estadísticas de uso se guardan
+          por un tiempo limitado y no incluyen tu nombre ni tu email.
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Conservación de datos">
+      <LegalSection title="9. Seguridad">
         <p>
-          Conservamos tus datos mientras tu cuenta esté activa o sea necesario para prestar el
-          servicio y cumplir obligaciones legales (por ejemplo, registros fiscales). Si solicitás
-          la baja, eliminaremos o anonimizaremos tus datos salvo aquellos que debamos conservar por ley.
+          La información viaja cifrada (HTTPS) y el acceso a la base de datos está restringido por reglas de seguridad:
+          cada usuario sólo puede ver lo que le corresponde. Ningún sistema es infalible, pero aplicamos medidas
+          razonables para proteger tus datos.
         </p>
       </LegalSection>
 
-      <LegalSection title="9. Menores de edad">
+      <LegalSection title="10. Menores de edad">
+        <p>ServiMarket es para mayores de 18 años. No recopilamos a sabiendas datos de menores.</p>
+      </LegalSection>
+
+      <LegalSection title="11. Cambios en esta política">
         <p>
-          ServiMarket está dirigido a personas mayores de 18 años. No recopilamos intencionalmente
-          datos de menores de edad.
+          Podemos actualizar esta política. La versión vigente, con su fecha, está siempre en esta página. Si el cambio
+          es importante, te lo vamos a avisar por email o dentro de la web.
         </p>
       </LegalSection>
 
-      <LegalSection title="10. Cambios en esta política">
-        <p>
-          Podemos actualizar esta política. Publicaremos la versión vigente en esta página con su
-          fecha de última actualización. El uso continuado del servicio implica la aceptación de
-          los cambios.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="11. Contacto">
-        <p>
-          Ante cualquier duda sobre esta política o el tratamiento de tus datos, escribinos a{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-green-600 hover:underline">{CONTACT_EMAIL}</a>.
-        </p>
+      <LegalSection title="12. Contacto">
+        <p>Ante cualquier duda sobre esta política o tus datos, escribinos a {mail}.</p>
       </LegalSection>
     </LegalLayout>
   );

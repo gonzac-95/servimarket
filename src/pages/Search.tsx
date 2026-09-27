@@ -12,6 +12,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { listLayout } from "../lib/layout";
 import { SEO_CATEGORIES, serviceDescription, serviceTitle, slugify, unslugify, useSeo } from "../lib/seo";
 import { track } from "../lib/analytics";
+import { providerSelect } from "../lib/providerColumns";
 
 // Sin props: /search (buscador). Con presetCategory: páginas por rubro
 // /servicios/:rubro y /servicios/:rubro/:ciudad (indexables, con título propio).
@@ -75,7 +76,7 @@ export default function Search({ presetCategory, citySlug }: { presetCategory?: 
     setLoading(true);
     const byCity = !!zoneCity;
     let q = supabase.from("providers")
-      .select(byCity ? "*, users!inner(id,name,avatar_url,city)" : "*, users(id,name,avatar_url,city)")
+      .select(byCity ? providerSelect("users!inner(id,name,avatar_url,city)") : providerSelect("users(id,name,avatar_url,city)"))
       .eq("is_available", true).eq("documents_verified", true).limit(40);
     if (byCity) q = q.ilike("users.city", zoneCity!);
     const dbName = cat ? categoryById(cat)?.dbName : undefined;

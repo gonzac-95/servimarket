@@ -124,6 +124,9 @@ export default function Login() {
           <div style={{ flex: 1, height: 1, background: t.line }} /><span>o continuá con</span><div style={{ flex: 1, height: 1, background: t.line }} />
         </div>
         <Button variant="outline" size="md" full icon={<GoogleG />} onClick={handleGoogle}>Continuar con Google</Button>
+        <div style={{ textAlign: "center", fontFamily: t.fontBody, fontSize: 11.5, color: t.inkSoft, lineHeight: 1.45, marginTop: -6 }}>
+          Si creás tu cuenta con Google, aceptás los <button onClick={() => navigate("/terminos")} style={{ all: "unset", cursor: "pointer", textDecoration: "underline" }}>Términos</button> y la <button onClick={() => navigate("/privacidad")} style={{ all: "unset", cursor: "pointer", textDecoration: "underline" }}>Política de privacidad</button>.
+        </div>
         <div style={{ textAlign: "center", fontFamily: t.fontBody, fontSize: 14, color: t.inkMute }}>
           ¿Sos nuevo? <button onClick={() => navigate("/register")} style={{ all: "unset", cursor: "pointer", color: t.green, fontWeight: 700 }}>Crear cuenta</button>
         </div>

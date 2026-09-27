@@ -11,6 +11,7 @@ import { Users, Briefcase, CreditCard, Shield, Home, Search, CheckCircle, XCircl
 import { Switch } from '../components/ui/switch';
 import { resetFeatureCache } from '../lib/features';
 import { calculateCommission, formatARS, type CommissionTier } from '../lib/commission';
+import { PROVIDER_PUBLIC_COLS, providerSelect } from "../lib/providerColumns";
 
 function StatCard({ icon: Icon, label, value, color }: any) {
   return (
@@ -98,8 +99,8 @@ function AdminProviders() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('providers').select('*, users(id,name,avatar_url,city)').order('created_at', { ascending: false })
-      .then(({ data }) => { setProviders(data as Provider[] ?? []); setLoading(false); });
+    supabase.from('providers').select(providerSelect("users(id,name,avatar_url,city)")).order('created_at', { ascending: false })
+      .then(({ data }) => { setProviders((data as unknown as Provider[]) ?? []); setLoading(false); });
   }, []);
 
   const shown = providers.filter(p => filter === 'all' || (filter === 'verified' ? p.documents_verified : !p.documents_verified));
@@ -245,7 +246,7 @@ function AdminJobs() {
 
   useEffect(() => {
     supabase.from('jobs')
-      .select('*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))')
+      .select(`*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(${PROVIDER_PUBLIC_COLS}, users(id,name,avatar_url,city))`)
       .order('created_at', { ascending: false }).limit(50)
       .then(({ data }) => { setJobs(data as Job[] ?? []); setLoading(false); });
   }, []);

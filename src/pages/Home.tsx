@@ -12,6 +12,7 @@ import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 import { track } from "../lib/analytics";
 import { useSeo } from "../lib/seo";
+import { providerSelect } from "../lib/providerColumns";
 
 export default function Home() {
   const t = useTheme();
@@ -33,14 +34,14 @@ export default function Home() {
     async function loadTop() {
       // Primero los mejores de la ciudad del usuario; si no hay, los de todo el país
       if (city) {
-        const { data } = await supabase.from("providers").select("*, users!inner(id,name,avatar_url,city)")
+        const { data } = await supabase.from("providers").select(providerSelect("users!inner(id,name,avatar_url,city)"))
           .eq("is_available", true).eq("documents_verified", true).ilike("users.city", city)
           .order("rating_avg", { ascending: false }).order("reviews_count", { ascending: false }).limit(8);
         if (data && data.length > 0) { setTop(data as unknown as Provider[]); return; }
       }
-      const { data } = await supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("is_available", true).eq("documents_verified", true)
+      const { data } = await supabase.from("providers").select(providerSelect("users(id,name,avatar_url,city)")).eq("is_available", true).eq("documents_verified", true)
         .order("rating_avg", { ascending: false }).order("reviews_count", { ascending: false }).limit(8);
-      setTop((data as Provider[]) ?? []);
+      setTop((data as unknown as Provider[]) ?? []);
     }
     loadTop();
   }, [user?.city]);

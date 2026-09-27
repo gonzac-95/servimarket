@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useFavorites } from "../hooks/useFavorites";
 import { ArrowLeft, Heart, Star, MapPin, CheckCircle2, Loader2 } from "lucide-react";
 import { DesktopChrome } from "../components/desktop/DesktopChrome";
+import { providerSelect } from "../lib/providerColumns";
 
 export default function Favorites() {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ export default function Favorites() {
       if (!user || favorites.length === 0) { setLoading(false); return; }
       const { data } = await supabase
         .from("providers")
-        .select("*, users(id,name,avatar_url,city)")
+        .select(providerSelect("users(id,name,avatar_url,city)"))
         .in("id", favorites);
       setProviders(data ?? []);
       setLoading(false);

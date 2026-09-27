@@ -13,6 +13,7 @@ import { MobileScreen } from "../components/mobile/MobileScreen";
 import { format } from "date-fns";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { track } from "../lib/analytics";
+import { PROVIDER_PUBLIC_COLS } from "../lib/providerColumns";
 
 // ── Comisión: desglose para prestador/cliente ──
 function CommissionBreakdown({ amount, role }: { amount: number; role: "provider" | "client" }) {
@@ -160,7 +161,7 @@ export default function JobDetail() {
   const desktop = useIsDesktop();
 
   const loadJob = useCallback(async () => {
-    const { data } = await supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))").eq("id", id).single();
+    const { data } = await supabase.from("jobs").select(`*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(${PROVIDER_PUBLIC_COLS}, users(id,name,avatar_url,city))`).eq("id", id).single();
     setJob(data); setLoading(false);
   }, [id]);
   const loadMessages = useCallback(async () => {
@@ -168,7 +169,7 @@ export default function JobDetail() {
     setMessages(data ?? []);
   }, [id]);
   const loadQuotes = useCallback(async () => {
-    const { data } = await supabase.from("quotes").select("*, providers(*, users(id,name,avatar_url))").eq("job_id", id).order("created_at", { ascending: false });
+    const { data } = await supabase.from("quotes").select(`*, providers(${PROVIDER_PUBLIC_COLS}, users(id,name,avatar_url))`).eq("job_id", id).order("created_at", { ascending: false });
     setQuotes(data ?? []);
   }, [id]);
 

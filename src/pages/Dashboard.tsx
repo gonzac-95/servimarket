@@ -11,6 +11,7 @@ import { Icon, CategoryIcon } from "../components/mobile/Icon";
 import { MobileScreen, TabBar } from "../components/mobile/MobileScreen";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { listLayout } from "../lib/layout";
+import { PROVIDER_PUBLIC_COLS } from "../lib/providerColumns";
 
 function stateInfo(job: Job, t: ReturnType<typeof useTheme>) {
   if (job.status === "in_progress" && job.provider_completed_at)
@@ -39,7 +40,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
     async function load() {
-      let q = supabase.from("jobs").select("*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(*, users(id,name,avatar_url,city))").order("created_at", { ascending: false });
+      let q = supabase.from("jobs").select(`*, clients:users!jobs_client_id_fkey(id,name,avatar_url,city), providers(${PROVIDER_PUBLIC_COLS}, users(id,name,avatar_url,city))`).order("created_at", { ascending: false });
       if (isClient) q = q.eq("client_id", user!.id);
       else q = q.eq("provider_id", provider?.id ?? "");
       const { data } = await q;

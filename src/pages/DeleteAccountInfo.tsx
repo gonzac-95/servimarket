@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import LegalLayout, { LegalSection } from "../components/LegalLayout";
+import { SUPPORT_EMAIL } from "../lib/support";
 
 // Página pública de eliminación de cuenta.
 // Google Play exige una URL accesible desde fuera de la app donde el
 // usuario pueda eliminar su cuenta o pedir la eliminación.
 export default function DeleteAccountInfo() {
   return (
-    <LegalLayout title="Eliminar tu cuenta de ServiMarket" updatedAt="Julio 2026">
+    <LegalLayout title="Eliminar tu cuenta de ServiMarket" updatedAt="Septiembre 2026">
       <LegalSection title="Desde la app (recomendado)">
         <p>
           Podés eliminar tu cuenta en cualquier momento desde la app:
@@ -26,25 +27,24 @@ export default function DeleteAccountInfo() {
       <LegalSection title="Qué datos se eliminan">
         <p>
           Al eliminar tu cuenta se borran de forma permanente tus datos personales:
-          nombre, correo electrónico, teléfono, foto de perfil, ubicación y credenciales
-          de acceso. No vas a poder volver a ingresar con esa cuenta.
+          nombre, correo electrónico, teléfono, fotos, ubicación, documentos de verificación
+          (si sos prestador) y credenciales de acceso. No vas a poder volver a ingresar con esa cuenta.
         </p>
       </LegalSection>
 
       <LegalSection title="Qué datos se conservan">
         <p>
-          El historial de trabajos, pagos y reseñas se conserva <strong>de forma
-          anonimizada</strong> (sin ningún dato que te identifique), porque forma parte
-          del historial de la otra parte y de los registros de facturación que exige
-          la normativa vigente.
+          El historial de trabajos y reseñas se conserva <strong>de forma
+          anonimizada</strong> (sin ningún dato que te identifique), porque también forma
+          parte del historial de la otra persona.
         </p>
       </LegalSection>
 
       <LegalSection title="¿No podés acceder a la app?">
         <p>
           Si perdiste el acceso a tu cuenta, escribinos a{" "}
-          <a href="mailto:soporte@servimarket.app" className="text-green-700 underline font-medium">
-            soporte@servimarket.app
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-green-700 underline font-medium">
+            {SUPPORT_EMAIL}
           </a>{" "}
           desde el correo con el que te registraste y procesamos la eliminación
           en un plazo máximo de 30 días.

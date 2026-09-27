@@ -10,6 +10,7 @@ import { Icon } from "../components/mobile/Icon";
 import { MobileScreen } from "../components/mobile/MobileScreen";
 import { useSeo } from "../lib/seo";
 import { track } from "../lib/analytics";
+import { providerSelect } from "../lib/providerColumns";
 
 function Stat({ label, value, sub, icon }: { label: string; value: string | number; sub: string; icon?: string }) {
   const t = useTheme();
@@ -67,7 +68,7 @@ export default function ProviderProfile() {
 
   useEffect(() => {
     async function load() {
-      const { data: p } = await supabase.from("providers").select("*, users(id,name,avatar_url,city)").eq("id", id).single();
+      const { data: p } = await supabase.from("providers").select(providerSelect("users(id,name,avatar_url,city)")).eq("id", id).single();
       setProvider(p);
       const { data: r } = await supabase.from("reviews").select("*, clients:users!reviews_client_id_fkey(id,name,avatar_url)").eq("provider_id", id).order("created_at", { ascending: false }).limit(20);
       setReviews(r ?? []);
