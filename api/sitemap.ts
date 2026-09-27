@@ -1,7 +1,7 @@
 // /sitemap.xml (vercel.json lo reescribe a /api/sitemap).
 // Incluye las páginas públicas, los rubros, rubro × ciudad donde hay
 // prestadores verificados, y el perfil de cada prestador verificado.
-import { PROVIDER_SELECT, SEO_CATEGORIES, SITE_URL, slugify, type PublicProvider, supabaseGet } from "./_shared";
+import { PROVIDER_SELECT, SEO_CATEGORIES, SITE_URL, slugify, type PublicProvider, supabaseGet } from "./_shared.js";
 
 type Entry = { loc: string; changefreq: string; priority: string; lastmod?: string };
 

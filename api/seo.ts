@@ -9,7 +9,7 @@
 import {
   PROVIDER_SELECT, SEO_CATEGORIES, SITE_URL, escapeHtml as esc, slugify, unslugify,
   type PublicProvider, supabaseGet,
-} from "./_shared";
+} from "./_shared.js";
 
 const DEFAULT_TITLE = "ServiMarket · Profesionales verificados para tu casa";
 const DEFAULT_DESC = "Encontrá gasistas, electricistas, plomeros y más, con DNI verificado y reseñas de trabajos reales. Pedí presupuesto y coordiná todo en un solo lugar.";
